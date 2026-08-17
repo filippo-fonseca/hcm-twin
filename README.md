@@ -70,6 +70,40 @@ the sensitivity matrix (D3), the confounding map (D4), the tie-breaker table (D5
 explorer (D6), and the compiled writeup (D7), with the CSV behind every figure committed alongside
 it.
 
+## What it found
+
+**The phenotype is a consequence, not an input.** Raising myosin availability and passive
+stiffness and thickening the wall yields, as outputs: a supranormal ejection fraction (0.75
+against a 0.66 healthy reference), a reduced stroke volume, an elevated filling pressure,
+reduced longitudinal strain despite preserved ejection fraction, and roughly twice the ATP
+cost per unit of external work. A test walks the package's syntax tree to prove no
+observable is ever assigned a literal.
+
+**Wall thickening alone raises ejection fraction.** Give the HCM geometry *healthy* material
+and the ejection fraction is 0.758, slightly above the diseased reference. That is correct
+physiology and it is the sharpest available statement of why this project exists: in a
+thick-walled ventricle, a reassuring ejection fraction is close to uninformative.
+
+**Two quantitative predictions land, and neither was fitted.** The reference patient loses
+5.3 ejection-fraction points at the mid dose, against a placebo-corrected 4.8 points
+reported for aficamten in SEQUOIA-HCM. No parameter in the model was calibrated against any
+published dose-response curve, and `docs/research/04_model_provenance.md` records the
+confidence label on all 65 constants so that claim can be checked rather than trusted.
+
+**The headline identifiability result is negative, and it is the useful kind.** Drug
+clearance explains about half the variance in who over-responds and is *structurally*
+invisible before the first dose: its total-order Sobol index on every baseline observable
+is exactly zero, and the Fisher information matrix has a zero eigenvalue whose null
+direction is 100% clearance. It enters the model only through drug exposure, so every
+derivative with respect to it is identically zero. **No provocation maneuver can help**,
+because there is no signal to amplify. What that argues for is pharmacokinetic information
+obtained before titration rather than inferred from its consequences.
+
+Of the four tissue parameters, calcium sensitivity and myosin availability are recoverable
+from a routine study; the two passive stiffness parameters trade off against each other.
+The tie-breaker table reports, per confounded pair, which maneuver helps and whether the
+discriminating signal clears the documented measurement error.
+
 ## Honesty constraints
 
 These are load-bearing, not boilerplate. See `docs/research/` and the limitations section of the

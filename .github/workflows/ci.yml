@@ -1,0 +1,117 @@
+# The project makes several claims of the form "this fails CI". This is the CI.
+#
+#   - every Section 7 validation gate passes
+#   - every constant in defaults.py has a sourced provenance row
+#   - no hidden ground-truth quantity can reach a feature matrix
+#   - the research dossier has no unresolved [VERIFY] markers
+#
+# A reduced-resolution end-to-end run is included so that a change which breaks the
+# pipeline is caught here rather than the next time someone runs the full study.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MPLBACKEND: Agg
+
+jobs:
+  checks:
+    name: lint, types, tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python -e '.[dev]'
+
+      - name: Lint
+        run: |
+          .venv/bin/ruff check src tests
+          .venv/bin/ruff format --check src tests
+
+      - name: Type check
+        run: .venv/bin/mypy
+
+      - name: Validation gates
+        run: .venv/bin/python -m hcmtwin.cli validate --results /tmp/ci-results
+
+      - name: Test suite
+        run: .venv/bin/python -m pytest -q
+
+  pipeline:
+    name: end-to-end pipeline (reduced resolution)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install
+        run: |
+          uv venv --python 3.12 .venv
+          uv pip install --python .venv/bin/python -e '.[dev]'
+
+      - name: Run the study at reduced resolution
+        run: |
+          .venv/bin/python -m hcmtwin.cli all \
+            --results /tmp/ci-results \
+            --n-base 24 --cases 6 --design 200 --mcmc-steps 800
+
+      - name: Check every deliverable was produced
+        run: |
+          set -e
+          for artifact in \
+            validation_table.md \
+            population_summary.json \
+            sensitivity_sobol.csv \
+            fig_sensitivity_matrix.png \
+            confounding_table.csv \
+            fig_confounding_map.png \
+            recovery_summary.csv \
+            tiebreaker_table.csv \
+            structural_identifiability.csv \
+            explorer.html \
+            manifest.json
+          do
+            test -s "/tmp/ci-results/$artifact" \
+              || { echo "missing or empty deliverable: $artifact"; exit 1; }
+          done
+          python -c "
+          import json, sys
+          m = json.load(open('/tmp/ci-results/manifest.json'))
+          if not m['validation_all_pass']:
+              sys.exit('validation gates did not all pass')
+          print('all deliverables present; validation gates pass')
+          "
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ci-results
+          path: /tmp/ci-results
+          retention-days: 7
