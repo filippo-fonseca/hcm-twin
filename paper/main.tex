@@ -103,6 +103,25 @@ their parameters could a clinic actually recover? \claim{That question decides w
 mechanistic model of HCM can ever be personalised from clinical data, as opposed to being
 illustrative.}
 
+\paragraph{What this work produces.} Four things, all in the repository and all regenerated
+by one command:
+
+\begin{enumerate}[nosep,leftmargin=1.4em]
+  \item A \textbf{validated mechanistic ventricle} that reproduces \nGatesPassed{} of
+        \nGates{} prespecified physiological gates and, unprompted, the HCM phenotype.
+  \item A \textbf{sensitivity matrix} (Figure~\ref{fig:sensitivity}) saying which hidden
+        tissue parameter each clinical measurement can see, and by how much.
+  \item A \textbf{confounding map and recovery table} (Figure~\ref{fig:confounding},
+        Table~\ref{tab:recovery}) saying which parameters a realistic echocardiogram
+        recovers and which it cannot, at two documented levels of measurement error.
+  \item A \textbf{tie-breaker table} (Table~\ref{tab:tiebreaker}) saying, per confounded
+        pair, whether any provocation maneuver resolves it and whether the discriminating
+        signal exceeds documented measurement variability.
+\end{enumerate}
+
+\noindent Every figure ships with the CSV behind it. The conclusions those four artifacts
+support, and the ones they do not, are set out in Section~\ref{sec:conclusions}.
+
 \section{The model}
 
 Three layers, coupled, zero-dimensional throughout. A steady-state beat solves in about
@@ -388,32 +407,125 @@ That distinction matters for anyone designing the study this analysis is meant t
 protocol justified by "the maneuver changes the measurement a lot" is justified by the wrong
 quantity.
 
-\section{Discussion}
+\section{Conclusions}
+\label{sec:conclusions}
 
-The headline result is negative and it is the useful kind of negative.
+Stated as separate claims, each with how much weight it will bear. The distinction matters:
+one of these follows from the structure of the problem and would survive a different model,
+and the others are properties of \emph{this} model under \emph{these} error bars.
 
-\claim{The dominant determinant of over-response is structurally invisible to any
-pre-treatment measurement.} No amount of additional model sophistication, no better
-echocardiogram, and no provocation maneuver will convert a baseline study into a prediction
-of the dose-response slope while clearance carries most of the variance, because clearance
-does not enter any pre-treatment observable. That redirects effort rather than merely
-recording a disappointment: what it argues for is pharmacokinetic information, either a
-CYP2C19 genotype or a probe dose with a concentration measurement, obtained \emph{before}
-titration rather than inferred from its consequences. That is a concrete and testable
-proposal, and it is consistent with the direction of current clinical interest in
-prospective genotyping.
+\paragraph{1. Drug clearance is structurally unidentifiable before the first dose.}
+\claim{Confidence: high, and independent of our calibration.} Clearance enters the model only
+through drug exposure, so at zero dose every partial derivative with respect to it is
+identically zero, the Fisher information matrix is exactly singular, and its null direction
+is \nullDirectionClearanceWeight\% clearance. This is arithmetic, not a numerical result: it
+would hold for any model in which clearance acts only through exposure, which is to say for
+any pharmacologically sensible one. Since clearance also carries half the
+variance in who crosses the floor (total-order Sobol index \outcomeTopST), \claim{the single largest determinant of over-response
+cannot be recovered from any pre-treatment measurement, however good.}
 
-The tissue-level story is more mixed (Table~\ref{tab:recovery}): some material parameters
-are recoverable from a routine study, and the two passive stiffness parameters trade off
-against each other, which is unsurprising given that they are two arms of one exponential.
-A caution about the direction of our errors is owed to the reader.
-\caution{Several modelling choices make the posterior tighter than reality.} The noise model
-treats observables as independent when their errors are correlated; it is Gaussian where real
-error has heavier tails; and the outflow-gradient noise used (35\%) is deliberately below the
-46--52\% coefficient of variation the literature reports for repeated measurement of that
-quantity. So a conclusion of the form ``these parameters remain confounded'' is safe here,
-and one of the form ``this maneuver separates them'' is fragile and should be read with that
-asymmetry attached.
+\paragraph{2. No provocation maneuver rescues it, and none of them resolves the tissue
+confounds either.} \claim{Confidence: medium.} For clearance the failure is structural, so
+the conclusion is as strong as claim 1: a maneuver amplifies signal, and there is no signal.
+For the tissue parameters the finding is empirical and therefore weaker: across four
+maneuvers and three confounded pairs, the best narrowing of an invisible direction was
+\bestRidgeShrinkage\%. The direction of that result is safer than its magnitude.
+
+\paragraph{3. Two of the five hidden parameters are recoverable from a routine study; three
+are not.} \claim{Confidence: medium; depends on the noise model.} Recoverable:
+\recoverableNames. Not: \unrecoverableNames. The two passive stiffness parameters trade off
+against each other, which is unsurprising for two arms of one exponential, and their
+confound is the one that a better measurement rather than a better maneuver would address.
+
+\paragraph{4. A high ejection fraction in a thick-walled ventricle is close to
+uninformative.} \claim{Confidence: medium; a model result, but a mechanistically transparent
+one.} Wall thickening alone, with entirely healthy tissue, raises ejection fraction to 0.758,
+above our diseased reference. What the thick wall does \emph{not} produce is the raised
+filling pressure, the raised E/e$'$ surrogate or the energetic penalty. Those need the
+material change, and they are what make a patient symptomatic.
+
+\paragraph{5. Posterior correlation is the wrong way to score a proposed maneuver.}
+\claim{Confidence: high; a methodological point that generalises.} Correlation describes the
+shape of the uncertainty and not its size, so information that constrains the combination
+the data already knew raises it while improving the inference. Score the width along the
+direction that was invisible instead. Relatedly, a discriminating signal computed with the
+other parameters held at truth is an upper bound and can be several-fold optimistic, because
+a real inference can mimic the maneuver's effect by moving what it does not know.
+
+\paragraph{What we cannot conclude.} That any of this describes a particular patient: nothing
+here is validated against one, and the comparisons to trial data are aggregate-to-aggregate.
+That the absolute numbers are right: a third of the model's constants are labelled
+\texttt{assumed}. That the tie-breaker result would survive a richer model: a maneuver that
+fails here might succeed in a model with regional mechanics or catecholamine-dependent
+relaxation, both of which this one lacks.
+
+\paragraph{A caution about the direction of our errors.} \caution{Several modelling choices
+make the posterior tighter than reality.} The noise model treats observables as independent
+when their errors are correlated; it is Gaussian where real error has heavier tails; and the
+outflow-gradient noise used (35\%) is deliberately below the 46--52\% coefficient of
+variation the literature reports for that quantity. So ``these parameters remain confounded''
+is a safe conclusion here and ``this maneuver separates them'' is a fragile one.
+
+\section{Where to look next}
+
+\subsection{Clinically}
+
+\paragraph{Get the pharmacokinetics before titrating, not from it.} This is the direct
+implication of claim 1, and it is actionable now. If clearance is both the dominant driver
+of over-response and invisible to imaging, then the information has to come from somewhere
+else: a CYP2C19 genotype, or a probe dose with a single concentration measurement before
+escalation begins. Current clinical interest in prospective genotyping is pointed the right
+way; this work supplies a mechanistic argument for why echocardiographic titration alone
+cannot substitute, rather than an empirical observation that it did not.
+
+\paragraph{A testable prediction, checkable in data that already exists.} Patients matched on
+baseline echocardiography but differing in measured exposure should show systematically
+different dose-response slopes, and patients matched on \emph{exposure} should show much less
+residual spread than patients matched on echocardiography. Both are post-hoc analyses of
+trial datasets that already contain paired pharmacokinetic and echocardiographic
+measurements. If the second comparison shows a large residual spread, claim 1 is incomplete
+and something in the heart is carrying more of the variance than this model gives it.
+
+\paragraph{For the tissue parameters, measure them rather than provoke them.} The passive
+stiffness confound is not a maneuver problem. A maneuver moves the operating point along a
+relation the study already cannot resolve; what would separate the two arms of the
+exponential is sampling the relation at more than one point, which means a direct stiffness
+measurement (shear-wave elastography, or invasive pressure-volume at two loading states)
+rather than a harder stress test.
+
+\paragraph{Do not design a protocol on effect size alone.} Claim 5, in clinical dress. A
+maneuver that visibly changes a measurement is not thereby diagnostic, if the change can be
+produced by something else you also have not measured.
+
+\subsection{Computationally}
+
+In rough order of how much each would change the conclusions:
+
+\begin{enumerate}[nosep,leftmargin=1.4em]
+  \item \textbf{Growth and remodelling}, so hypertrophy develops over simulated months
+        rather than being sampled. This is the largest structural gap: it would let the model
+        say how a geometry-plus-material combination arose, and whether the measured/hidden
+        split is stable over a disease course.
+  \item \textbf{Regional mechanics}, via a three-dimensional idealised ventricle, to test
+        whether the zero-dimensional conclusions hold once asymmetric hypertrophy, fibre
+        disarray and systolic anterior motion are representable. Claim 2 is the one most
+        likely to move.
+  \item \textbf{Differentiable inversion} (a JAX reimplementation), which would replace the
+        per-patient polynomial emulator with exact gradients and make the identifiability
+        analysis cheap enough to run over many more patients and maneuvers.
+  \item \textbf{Geometry personalisation} against a public cardiac-MRI cohort, which is what
+        would turn ``pinned geometry'' from a modelling convenience into a measurement.
+  \item \textbf{Catecholamine-dependent relaxation}, which the model lacks and which is the
+        most likely reason its filling pressure fails to improve on treatment where trials
+        report that it does.
+\end{enumerate}
+
+\paragraph{Three measurements the literature owes this model.} Recorded as \texttt{[GAP]} in
+the dossier rather than filled with plausible values: the parked-versus-available myosin
+fraction in healthy and HCM \emph{human} myocardium; a representative-fibre passive stiffness
+pair fitted to human tissue under this constitutive form; and test-retest reproducibility for
+maximal wall thickness in an HCM cohort. The first two are why two of the model's most
+important constants are labelled \texttt{calibrated} rather than \texttt{measured}.
 
 \section{Limitations}
 
@@ -448,7 +560,7 @@ them.
         to trial data compare aggregate behaviour to published aggregates.
 \end{itemize}
 
-\section{Reproducibility}
+\section{Reproducibility and transparency}
 
 One command reproduces every figure, and every figure ships with the CSV behind it.
 \texttt{make all} inside the supplied container runs the test suite (all \nGates{} validation
@@ -459,5 +571,36 @@ from a results file at build time; none is typed. The research dossier in
 \texttt{docs/research/} records the source of every constant, every simplification made
 relative to it, and every place the literature failed to supply what the model needed; those
 gaps are marked and described rather than filled with plausible values.
+
+\paragraph{What was calibrated, and against what.} The healthy and HCM reference patients
+were calibrated by grid search against resting haemodynamic \emph{ranges} and three
+ejection-realism targets. \claim{No parameter was calibrated against any published
+dose-response curve, any trial outcome, or the observed rate of ejection-fraction
+excursions.} The provenance table labels all 65 constants \texttt{measured} (10),
+\texttt{calibrated} (22) or \texttt{assumed} (33), so that claim is checkable rather than
+merely asserted. The two comparisons to trial data in Section~3 and Section~4 are therefore
+predictions; one of them agrees closely and the other does not, and both are reported.
+
+\paragraph{Use of AI assistance.} This project was implemented with \textbf{Claude Code}
+(Anthropic) working alongside the author. The assistant wrote the bulk of the Python
+implementation, the test suite, the figure code and the first drafts of the research dossier
+and this document, and carried out the literature search, the parameter calibration sweeps
+and the debugging of the model failures described in Section~2. Direction, scope, scientific
+judgement, and acceptance of every result remained with the author.
+
+Two disclosures follow from that and are worth making explicitly, because they bear on how
+this work should be read. First, \textbf{the citations were checked, and the gaps were left
+open}: every reference in the bibliography was located and its content verified against the
+abstract or full text, and where a number the model needed could not be traced to a primary
+source the dossier says \texttt{[GAP]} and describes what would be required, rather than
+substituting a plausible value or a fabricated reference. Second, \textbf{several substantive
+findings emerged from failures rather than from design}: the negative end-systolic
+elastance, the filling pressure insensitive to its own stiffness, the misleading correlation
+metric. Each is documented in the source, the dossier and this paper together with the
+symptom that exposed it, so a reader can judge the fix rather than take it on trust.
+
+\paragraph{Availability.} Code, research dossier, results, figures and their underlying CSVs
+are in the repository, along with a pinned lockfile and a container image that reproduces the
+run described here from a clean checkout.
 
 \end{document}
