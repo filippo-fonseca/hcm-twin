@@ -1,0 +1,17 @@
+{
+  "n_sampled": 5005.0,
+  "n_usable": 5005.0,
+  "usable_fraction": 1.0,
+  "n_trial_eligible": 1834.0,
+  "trial_eligible_fraction": 0.36643356643356645,
+  "all_conditions_physiological_fraction": 0.9484515484515484,
+  "over_responder_rate_usable": 0.26593406593406593,
+  "over_responder_rate_eligible": 0.014176663031624863,
+  "median_baseline_ef_eligible": 0.7170923681863861,
+  "median_ef_drop_at_mid_dose_eligible": 0.06123704172679617,
+  "median_baseline_gradient_eligible_mmhg": 66.6605559401622,
+  "median_wall_thickness_eligible_cm": 1.6384515284503682,
+  "obstructive_fraction_eligible": 0.9918211559432933,
+  "seed": 20260816.0,
+  "n_base": 385.0
+}

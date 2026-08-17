@@ -1,0 +1,13 @@
+observable,units,kind,realistic,optimistic,invasive,routine
+edv_ml,mL,relative,0.08,0.05,False,True
+peak_strain_amplitude,dimensionless,relative,0.08,0.05,False,True
+esv_ml,mL,relative,0.1,0.06,False,True
+lv_mass_g,g,relative,0.1,0.06,False,True
+stroke_volume_ml,mL,relative,0.12,0.07,False,True
+cardiac_output_l_per_min,L/min,relative,0.12,0.08,False,True
+thickness_to_cavity_ratio,1/cm,relative,0.12,0.07,False,True
+stroke_volume_index_ml_per_m2,mL/m^2,relative,0.12,0.07,False,True
+e_over_e_prime,dimensionless,relative,0.15,0.09,False,True
+stroke_work_j,J,relative,0.15,0.1,True,False
+atp_cost_per_stroke_work,AU/J,relative,0.2,0.12,False,False
+peak_lvot_gradient_mmhg,mmHg,relative,0.35,0.2,False,True

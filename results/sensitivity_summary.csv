@@ -1,0 +1,6 @@
+parameter,best_observable,best_total_order,best_routine_observable,best_routine_total_order,n_observables_above_0.05,visible
+a_pas_kpa,atp_cost_per_stroke_work,0.4359138960957523,cardiac_output_l_per_min,0.3909356615242874,13,True
+b_pas,atp_cost_per_stroke_work,0.3889396620873204,e_over_e_prime,0.30731120542189067,13,True
+ca50_ref_um,atp_cost_per_stroke_work,0.18102685745580807,esv_ml,0.1248182165984988,6,True
+phi_baseline,esv_ml,0.06337091836655308,esv_ml,0.06337091836655308,3,True
+clearance_l_per_h,edv_ml,0.0,edv_ml,0.0,0,False

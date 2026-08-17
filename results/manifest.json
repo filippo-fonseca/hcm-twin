@@ -1,0 +1,18 @@
+{
+  "seed": 20260816,
+  "population_n_base": 385,
+  "n_patients": 5005,
+  "n_identifiability_cases": 50,
+  "n_surrogate_design": 400,
+  "mcmc_steps": 3000,
+  "timings_seconds": {
+    "validate": 0.98,
+    "figures": 1.2,
+    "sensitivity": 1.26,
+    "identifiability": 452.74,
+    "tiebreaker": 251.85,
+    "paper": 1.08,
+    "total": 966.52
+  },
+  "validation_all_pass": true
+}

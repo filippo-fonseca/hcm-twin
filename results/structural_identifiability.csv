@@ -1,0 +1,6 @@
+parameter,mean_invisible_weight,max_total_order_on_observables,total_order_on_outcome,structurally_invisible_at_baseline,matters_for_outcome,remedy
+clearance_l_per_h,1.0,0.0,0.5048915529247698,True,True,no pre-treatment maneuver can help; needs genotype or a probe dose with a concentration measurement
+phi_baseline,0.0,0.06337091836655308,0.22019374274567224,False,True,"weakly identified; a maneuver may help, see the tie-breaker table"
+ca50_ref_um,0.0,0.18102685745580807,0.09990649798318768,False,False,does not drive the outcome
+a_pas_kpa,0.0,0.4359138960957523,0.06668230718494705,False,False,does not drive the outcome
+b_pas,0.0,0.3889396620873204,0.060004778208881976,False,False,does not drive the outcome

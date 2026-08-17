@@ -1,0 +1,4 @@
+confounded_pair,best_maneuver,correlation_before,correlation_after,correlation_drop,ridge_width_before,ridge_width_after,ridge_shrinkage,ci_shrinkage_a,ci_shrinkage_b,discriminating_observable,expected_signal,signal_units,signal_to_noise,exceeds_measurement_noise,maneuver_usable_fraction,patients_agreeing_on_observable,n_patients
+phi_baseline / ca50_ref_um,exercise,0.469,0.719,-0.281,0.1775,0.161,0.054,0.026,0.425,peak_strain_amplitude,0.0049,dimensionless,2.19,True,1.0,0.58,50
+a_pas_kpa / ca50_ref_um,exercise,0.119,0.106,0.006,0.3524,0.3641,0.046,0.043,0.425,peak_strain_amplitude,0.0117,dimensionless,8.63,True,1.0,0.5,50
+a_pas_kpa / b_pas,tachycardia,0.676,0.847,-0.099,0.4074,0.4149,-0.021,0.057,0.02,peak_strain_amplitude,0.004,dimensionless,0.96,False,1.0,0.46,50
