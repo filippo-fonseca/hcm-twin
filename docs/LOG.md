@@ -13,7 +13,7 @@ re-deriving anything.
 | Deliverable | State |
 |---|---|
 | D0 research dossier | **done** — 8 documents + bibliography, zero `[VERIFY]`, every `[GAP]` justified, CI-enforced |
-| D1 `hcmtwin` package | **done** — ruff, ruff format and mypy all clean; 121 tests green |
+| D1 `hcmtwin` package | **done** — ruff, ruff format and mypy all clean; 137 tests green |
 | D2 validation report | **done** — 35 gates, all pass; `results/validation_table.md` |
 | D3 sensitivity matrix | **done** — `results/fig_sensitivity_matrix.png` + CSV |
 | D4 confounding map | **done** — `results/fig_confounding_map.png` + CSV |
@@ -22,7 +22,7 @@ re-deriving anything.
 | D7 writeup | **done** — `paper/main.pdf`, 8 pages, every number generated from results |
 
 ```bash
-make test        # 121 tests, including every Section 7 gate
+make test        # 137 tests, including every Section 7 gate
 make all         # everything, from a clean checkout
 make docker-all  # the same, reproducibly
 ```
