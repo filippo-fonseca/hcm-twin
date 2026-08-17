@@ -245,6 +245,11 @@ filling pressure, the raised E/e', or the energetic penalty.
 - The paper was compiled and read page by page; the defects that found are listed above.
 - CI runs the suite plus a reduced-resolution end-to-end pipeline and asserts every
   deliverable is produced.
+- **`make all` was run inside the container from a clean checkout.** The first attempt
+  failed at the paper stage and caught a real bug (the manifest was written after the
+  document that reads it); the second completed in 375 s with pdflatex producing an 841 kB
+  PDF, every deliverable present, and `validation_all_pass: true`. That is the definition
+  of done, actually executed rather than asserted.
 
 ## If you are picking this up
 
