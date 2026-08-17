@@ -103,6 +103,29 @@ their parameters could a clinic actually recover? \claim{That question decides w
 mechanistic model of HCM can ever be personalised from clinical data, as opposed to being
 illustrative.}
 
+\paragraph{What we did, in four steps.} Stated plainly, because the rest of the paper is
+the execution of exactly this:
+
+\begin{enumerate}[nosep,leftmargin=1.4em]
+  \item \textbf{Build a ventricle whose knobs are the biology.} A three-layer mechanistic
+        model whose inputs are tissue and molecular quantities (how many myosin heads are
+        available, how calcium-sensitive the filaments are, how stiff the passive tissue is,
+        how fast the drug is cleared) and whose outputs are the things a clinic measures.
+  \item \textbf{Find which of those knobs decide who over-responds.} Sample
+        \nSampled{} virtual patients, dose each one, and compute total-order Sobol indices of
+        every hidden parameter on the ejection-fraction drop. This answers ``what actually
+        drives the risk''.
+  \item \textbf{Find which of those knobs a clinical study can see.} Two levels: sensitivity
+        of each measurement to each parameter, and then the harder question of whether the
+        joint map from measurements back to parameters can be \emph{inverted} at all, via
+        Fisher information and posterior sampling under a documented noise model.
+  \item \textbf{Ask whether a stress test rescues what is invisible.} Search four provocation
+        maneuvers for one that narrows a confounded direction by more than measurement error.
+\end{enumerate}
+
+\noindent Steps 2 and 3 produce two rankings of the same five parameters, and comparing them
+is the result: see Section~\ref{sec:inversion}.
+
 \paragraph{What this work produces.} Four things, all in the repository and all regenerated
 by one command:
 
@@ -284,6 +307,49 @@ does not move any pre-treatment measurement at all.
   \label{fig:sensitivity}
 \end{figure}
 
+\subsection{The central result: importance and visibility run backwards}
+\label{sec:inversion}
+
+Step 2 asked which hidden parameters drive over-response. Step 3 asked which ones a
+measurement can see. Table~\ref{tab:inversion} puts the two rankings side by side, and they
+run in opposite directions.
+
+\input{table_inversion}
+\captionof{table}{\label{tab:inversion}Left: how much each hidden parameter drives the
+ejection-fraction drop (total-order Sobol index). Right: the largest total-order index that
+parameter achieves on \emph{any} observable, which is the best case for measuring it. The two
+rankings are reversed, with only the bottom two swapped. Generated from
+\texttt{results/visibility\_vs\_importance.csv}.}
+
+\medskip
+
+\claim{The parameters a clinical study sees best are the ones that matter least for the
+outcome, and the parameter carrying half the outcome variance is the one it cannot see at
+all.} The Spearman rank correlation between driving the outcome and being visible is
+\inversionSpearman{} ($p=\inversionSpearmanP$), and it is identical if the analysis is
+restricted to routine non-invasive observables only. Reading the same table by variance
+rather than by rank: the two parameters a realistic study recovers account for
+\driverMassRecoverable{} of the total-order index on the outcome, while the three it misses
+account for \driverMassLost{}. The clinic gets the third of the risk it can see, and loses
+the two thirds it cannot.
+
+\caution{Five parameters is a small sample, so read the sign and not the decimal.} A rank
+correlation over five items is a descriptive statement about this model's parameter set, not
+an estimated quantity with a meaningful confidence interval. The individual entries are the
+evidence; the correlation is a way of summarising them. What is \emph{not} sample-dependent
+is the extreme entry: clearance is at zero visibility for a structural reason given in
+Section~\ref{sec:conclusions}, not because five was too few.
+
+\paragraph{Why the two steps of ``can we see it'' are both needed.} Visibility in
+Table~\ref{tab:inversion} is necessary and not sufficient, and the table contains an example
+in each direction. Myosin availability shifts no single observable much
+(\bestSTPhiBaseline{}) and is nonetheless recovered, because several weak signals combine
+into one well-determined direction. The two passive stiffness parameters are the most visible
+in the whole model (\bestSTAPasKpa{} and \bestSTBPas{}) and neither is recovered, because
+they are visible through the same combination: the map is many-to-one, and high sensitivity
+buys nothing against it. This is why Section~\ref{sec:inversion} does not end the paper and
+the posterior analysis follows.
+
 \subsection{Identifiability}
 
 \paragraph{Local.} Fisher information matrices were built by finite-differencing the
@@ -409,6 +475,12 @@ quantity.
 
 \section{Conclusions}
 \label{sec:conclusions}
+
+\paragraph{In one sentence.} \claim{The tissue and molecular parameters that decide who
+over-responds to myosin inhibition are, in this model, close to the complement of the ones a
+clinical study can recover: rank correlation \inversionSpearman{} between mattering and being
+visible, with \driverMassLost{} of the outcome-driving index sitting on parameters a realistic
+echocardiogram does not recover.} Everything below is that sentence taken apart.
 
 Stated as separate claims, each with how much weight it will bear. The distinction matters:
 one of these follows from the structure of the problem and would survive a different model,
