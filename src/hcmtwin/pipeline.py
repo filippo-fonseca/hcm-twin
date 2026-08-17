@@ -422,9 +422,12 @@ def run_all(config: Config | None = None) -> dict[str, Any]:
     from .viz import dashboard
 
     dashboard.build(config.path("explorer.html"), labelled=labelled)
-    run_paper(config)
-    config.timings["total"] = round(time.perf_counter() - overall, 2)
 
+    # The manifest is written *before* the paper, because the paper's numbers are read
+    # from it. Writing it afterwards worked on a machine that had run the pipeline before
+    # and failed on the first clean container build, which is the whole reason the
+    # container build exists.
+    config.timings["total"] = round(time.perf_counter() - overall, 2)
     manifest = {
         "seed": config.seed,
         "population_n_base": config.population_n_base,
@@ -435,6 +438,10 @@ def run_all(config: Config | None = None) -> dict[str, Any]:
         "timings_seconds": config.timings,
         "validation_all_pass": bool(validation["pass"].all()),
     }
+    config.path("manifest.json").write_text(json.dumps(manifest, indent=2))
+
+    run_paper(config)
+    manifest["timings_seconds"] = config.timings
     config.path("manifest.json").write_text(json.dumps(manifest, indent=2))
     logger.info("pipeline complete in %.0f s", config.timings["total"])
     return {

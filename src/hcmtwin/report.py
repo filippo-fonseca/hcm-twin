@@ -15,6 +15,8 @@ from __future__ import annotations
 
 import json
 import logging
+import pathlib
+import re
 from pathlib import Path
 
 import numpy as np
@@ -27,6 +29,35 @@ from .validation import exposure_response_comparison
 logger = logging.getLogger(__name__)
 
 MISSING = r"\textbf{??}"
+
+_MACRO_PATTERN = re.compile(r"\\([a-z][A-Za-z]{4,})\b")
+
+_NOT_OURS = frozenset(
+    """
+    claim caution input textbf textit texttt emph section paragraph subsection includegraphics
+    caption label centering hspace vspace noindent begin documentclass usepackage newcommand
+    definecolor captionsetup setlist graphicspath maketitle title author date large small
+    footnote href linewidth textcolor subfigure hfill quad qquad frac tfrac times approx
+    mathrm mathbf displaystyle varepsilon sigma alpha beta gamma delta lambda theta omega
+    toprule midrule bottomrule captionof resizebox textasciicircum textasciitilde hidelinks
+    """.split()
+)
+
+
+def required_macros(tex_source: pathlib.Path | None) -> set[str]:
+    """Every macro the document references, read from the document.
+
+    Derived rather than hand-listed. A hand-maintained list is a second place to update and
+    therefore a place to forget: the first clean-container build failed with an undefined
+    control sequence because a macro the paper used was only emitted when a results file
+    happened to exist. Reading the document makes that failure impossible, because anything
+    it references is declared here first, defaulting to a visible placeholder.
+    """
+    if tex_source is None or not tex_source.exists():
+        return set()
+    text = tex_source.read_text(encoding="utf-8")
+    return {name for name in _MACRO_PATTERN.findall(text) if name not in _NOT_OURS}
+
 
 PRETTY: dict[str, str] = {
     "phi_baseline": "myosin availability",
@@ -117,9 +148,18 @@ def _read(path: Path) -> pd.DataFrame | None:
     return pd.read_csv(path)
 
 
-def build_macros(results_dir: Path) -> str:
-    """Read every artifact and emit the macro file the paper includes."""
+def build_macros(results_dir: Path, tex_source: Path | None = None) -> str:
+    """Read every artifact and emit the macro file the paper includes.
+
+    Args:
+        results_dir: Where the stage outputs live.
+        tex_source: The document that will ``\\input`` the result. Every macro it references
+            is declared, so a partial results directory yields visible placeholders rather
+            than a compilation failure.
+    """
     m = _Macros()
+    for name in sorted(required_macros(tex_source)):
+        m.set(name, None)
 
     # --- model constants a reader might want quoted --------------------------------
     m.set("phiHealthy", d.PHI_HEALTHY, 2)
@@ -319,9 +359,10 @@ def build_macros(results_dir: Path) -> str:
     return m.render()
 
 
-def write_macros(results_dir: Path, output: Path) -> Path:
+def write_macros(results_dir: Path, output: Path, tex_source: Path | None = None) -> Path:
     output.parent.mkdir(parents=True, exist_ok=True)
-    output.write_text(build_macros(results_dir), encoding="utf-8")
+    source = tex_source if tex_source is not None else output.with_name("main.tex")
+    output.write_text(build_macros(results_dir, source), encoding="utf-8")
     logger.info("wrote %s", output)
     return output
 
