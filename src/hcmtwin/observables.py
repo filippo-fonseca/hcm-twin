@@ -378,6 +378,28 @@ def observe_arrays(
     }
 
 
+def physiological_mask(fields: dict[str, np.ndarray]) -> np.ndarray:
+    """Which rows of a cohort result describe a heart rather than a solver artefact.
+
+    Extreme corners of the sampled parameter space, especially under an aggressive
+    maneuver, produce solves that are arithmetically fine and physiologically meaningless:
+    a ventricle that cannot fill at all, a negative cavity volume, a collapsed arterial
+    pressure. These are excluded everywhere rather than trimmed, and the *count* is always
+    reported, because a maneuver that is uninterpretable in a tenth of the patients it was
+    proposed for is a finding about the maneuver.
+    """
+    values = np.column_stack([np.asarray(fields[name], dtype=float) for name in OBSERVABLE_NAMES])
+    return (
+        np.isfinite(values).all(axis=1)
+        & (np.asarray(fields["edv_ml"]) > 5.0)
+        & (np.asarray(fields["esv_ml"]) > 0.0)
+        & (np.asarray(fields["stroke_volume_ml"]) > 1.0)
+        & (np.asarray(fields["ejection_fraction"]) > 0.05)
+        & (np.asarray(fields["ejection_fraction"]) < 0.99)
+        & (np.asarray(fields["mean_arterial_pressure_mmhg"]) > 20.0)
+    )
+
+
 def observe(
     result: BeatResult,
     measured: MeasuredGeometry,

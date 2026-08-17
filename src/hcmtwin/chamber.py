@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
+
 from .backend import SCALAR, Backend, Numeric
 from .units import MMHG_PER_KPA
 
@@ -85,14 +87,25 @@ def fiber_stress_from_pressure_kpa(
     )
 
 
-def wall_thickness_cm(cavity_volume_ml: float, wall_volume_ml: float) -> float:
+def wall_thickness_cm(cavity_volume_ml, wall_volume_ml):  # type: ignore[no-untyped-def]
     """Wall thickness under a thick-walled spherical assumption, cm.
+
+    Accepts scalars or arrays. Cavity volume is floored at zero before the cube root: a
+    corner of the sampled parameter space under an aggressive maneuver can drive the
+    solver's cavity marginally negative, and a complex cube root would propagate a NaN
+    through an entire cohort's observables rather than confining the problem to the one
+    patient it belongs to. Those rows are separately flagged as non-physiological and
+    excluded, so the floor changes no reported value; it only stops one bad row spoiling
+    the batch.
 
     Reported rather than the raw wall volume so that the model emits the same quantity a
     sonographer measures. A healthy 140 mL wall around a 120 mL cavity gives about
     0.92 cm; a 250 mL HCM wall around an 80 mL cavity gives about 1.6 cm. Neither number
     was tuned to land there.
     """
-    r_inner_cm = (3.0 * cavity_volume_ml / (4.0 * math.pi)) ** (1.0 / 3.0)
-    r_outer_cm = (3.0 * (cavity_volume_ml + wall_volume_ml) / (4.0 * math.pi)) ** (1.0 / 3.0)
+    safe_cavity = np.maximum(cavity_volume_ml, 0.0)
+    r_inner_cm = (3.0 * safe_cavity / (4.0 * math.pi)) ** (1.0 / 3.0)
+    r_outer_cm = (
+        3.0 * np.maximum(safe_cavity + wall_volume_ml, 0.0) / (4.0 * math.pi)
+    ) ** (1.0 / 3.0)
     return r_outer_cm - r_inner_cm

@@ -28,7 +28,7 @@ import pandas as pd
 from . import defaults as d
 from .drug import APPROVED_DOSE_LADDER_MG_PER_DAY
 from .model import simulate_cohort
-from .observables import OBSERVABLE_NAMES, hidden_truth_arrays, observe_arrays
+from .observables import hidden_truth_arrays, observe_arrays, physiological_mask
 from .parameters import Loading, ModelConstants
 from .provocation import ALL_PROVOCATIONS, REST, Provocation
 
@@ -220,16 +220,9 @@ def _simulate_condition(
         }
     )
     # Guard rails: a virtual patient whose solve produced a non-finite or physically
-    # impossible result is flagged rather than silently averaged into a Sobol index.
-    frame["physiological"] = (
-        np.isfinite(frame[list(OBSERVABLE_NAMES)].to_numpy()).all(axis=1)
-        & (frame["edv_ml"].to_numpy() > 5.0)
-        & (frame["esv_ml"].to_numpy() > 0.0)
-        & (frame["stroke_volume_ml"].to_numpy() > 1.0)
-        & (frame["ejection_fraction"].to_numpy() > 0.05)
-        & (frame["ejection_fraction"].to_numpy() < 0.99)
-        & (frame["mean_arterial_pressure_mmhg"].to_numpy() > 20.0)
-    )
+    # impossible result is flagged rather than silently averaged into a Sobol index. The
+    # same check is used by the surrogate fit, so the two cannot diverge.
+    frame["physiological"] = physiological_mask(observables)
     return frame
 
 

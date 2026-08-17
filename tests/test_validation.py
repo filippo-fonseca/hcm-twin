@@ -37,17 +37,13 @@ from hcmtwin import (
 )
 from hcmtwin import defaults as d
 from hcmtwin.drug import APPROVED_DOSE_LADDER_MG_PER_DAY
+from hcmtwin.validation import HEALTHY_GATES, exposure_response_comparison as _exposure
 
 GATES: dict[str, tuple[float, float]] = {
-    "ejection_fraction": (0.55, 0.70),
-    "edv_ml": (110.0, 130.0),
-    "stroke_volume_ml": (65.0, 75.0),
-    "peak_lv_pressure_mmhg": (110.0, 130.0),
-    "end_diastolic_pressure_mmhg": (5.0, 12.0),
-    "mean_arterial_pressure_mmhg": (85.0, 95.0),
-    "cardiac_output_l_per_min": (4.5, 5.5),
+    name: (low, high) for name, (low, high, _units) in HEALTHY_GATES.items()
 }
-"""Healthy resting haemodynamics. Sourced in ``05_validation_targets.md``."""
+"""Healthy resting haemodynamics, imported from :mod:`hcmtwin.validation` rather than
+restated, so a target cannot be tightened in the report and left alone in the test."""
 
 
 def _run(geometry, material, loading, dose=0.0):  # type: ignore[no-untyped-def]
@@ -336,27 +332,6 @@ def test_drug_lowers_availability_and_energy_cost() -> None:
 # ======================================================================================
 
 
-def exposure_response_comparison() -> dict[str, float]:
-    """Simulated ejection-fraction change at the mid dose, for comparison with trial data.
-
-    Reported by the validation table and asserted only loosely here. NOT a fit: no model
-    parameter was calibrated against the published curve, so this is a prediction and is
-    labelled as one wherever it appears.
-    """
-    untreated, _ = _run(HCM_GEOMETRY, HCM_MATERIAL, RESTING_LOADING, 0.0)
-    mid, _ = _run(HCM_GEOMETRY, HCM_MATERIAL, RESTING_LOADING, d.DOSE_MID_MG_PER_DAY)
-    top, _ = _run(HCM_GEOMETRY, HCM_MATERIAL, RESTING_LOADING, 15.0)
-    return {
-        "ef_baseline": untreated.ejection_fraction,
-        "ef_mid_dose": mid.ejection_fraction,
-        "ef_change_points_mid": 100.0 * (mid.ejection_fraction - untreated.ejection_fraction),
-        "ef_change_points_top": 100.0 * (top.ejection_fraction - untreated.ejection_fraction),
-        "gradient_change_mmhg_mid": (
-            mid.peak_lvot_gradient_mmhg - untreated.peak_lvot_gradient_mmhg
-        ),
-    }
-
-
 def test_exposure_response_direction_and_magnitude() -> None:
     """Direction must be right; magnitude must be the right order.
 
@@ -365,7 +340,7 @@ def test_exposure_response_direction_and_magnitude() -> None:
     that reproduced a 40-point ejection-fraction collapse, or a rise, would be wrong even
     though nothing was fitted.
     """
-    comparison = exposure_response_comparison()
+    comparison = _exposure()
     assert comparison["ef_change_points_mid"] < 0.0, "dose must lower ejection fraction"
     assert -20.0 < comparison["ef_change_points_mid"] < -0.5, (
         f"ejection-fraction change of {comparison['ef_change_points_mid']:.1f} points at the "

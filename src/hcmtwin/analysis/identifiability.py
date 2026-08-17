@@ -379,15 +379,38 @@ def build_surrogates(
             logger.warning("surrogate design for %s did not fully converge in %d beats",
                            condition.key, beats)
 
-        from ..observables import observe_arrays
+        from ..observables import observe_arrays, physiological_mask
 
         fields = observe_arrays(summary, wall, bsa, heart_rate)
         outputs = np.column_stack([fields[name] for name in feature_names])
+        physiological = physiological_mask(fields)
 
         for index, case in enumerate(cases):
             slice_ = slice(index * n_design, (index + 1) * n_design)
+            keep = physiological[slice_]
+            # Fitting through unphysiological rows is what produced a held-out R^2 of -12
+            # on the exercise condition in an earlier run: a handful of collapsed solves
+            # dragged a smooth polynomial into nonsense across the whole box.
+            if keep.sum() < 60:
+                logger.warning(
+                    "patient %d, %s: only %d/%d design points physiological; skipping",
+                    case.patient_id, condition.key, int(keep.sum()), n_design,
+                )
+                report_rows.append(
+                    {
+                        "patient_id": case.patient_id,
+                        "condition": condition.key,
+                        "min_r2": float("nan"),
+                        "median_r2": float("nan"),
+                        "worst_output": None,
+                        "design_points_used": int(keep.sum()),
+                        "design_points_dropped": int(n_design - keep.sum()),
+                        "fitted": False,
+                    }
+                )
+                continue
             surrogate = Surrogate(names=feature_names).fit(
-                log_design, outputs[slice_], seed=seed + index
+                log_design[keep], outputs[slice_][keep], seed=seed + index
             )
             surrogates[(case.patient_id, condition.key)] = surrogate
             report = surrogate.error_report()
@@ -398,9 +421,16 @@ def build_surrogates(
                     "min_r2": report["min_r2"],
                     "median_r2": report["median_r2"],
                     "worst_output": report["worst_output"],
+                    "design_points_used": int(keep.sum()),
+                    "design_points_dropped": int(n_design - keep.sum()),
+                    "fitted": True,
                 }
             )
-        logger.info("condition %s: surrogates fitted for %d patients", condition.key, n_cases)
+        dropped = int((~physiological).sum())
+        logger.info(
+            "condition %s: surrogates fitted, %d/%d design solves unphysiological (%.1f%%)",
+            condition.key, dropped, len(physiological), 100.0 * dropped / len(physiological),
+        )
 
     return surrogates, pd.DataFrame(report_rows)
 

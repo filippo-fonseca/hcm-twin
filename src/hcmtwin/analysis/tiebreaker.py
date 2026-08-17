@@ -176,40 +176,54 @@ def run(
         baseline = baseline_posteriors.get(case.patient_id)
         if baseline is None:
             continue
-        for pair in pairs:
-            direction = confounded_direction(baseline, pair)
-            before = abs(float(baseline.correlation()[pair.index_a, pair.index_b]))
-            before_widths = baseline.credible_widths()
-            for condition in conditions:
-                try:
-                    posterior = sample_posterior(
-                        case,
-                        surrogates,
-                        (BASELINE, condition),
-                        noise_level,
-                        seed=seed + 977 * case_index,
-                        constants=constants,
-                    )
-                    after = abs(
-                        float(posterior.correlation()[pair.index_a, pair.index_b])
-                    )
-                    after_widths = posterior.credible_widths()
-                    signal = discriminating_signal(
-                        case, direction, condition, noise_level, constants=constants
-                    )
-                    usable = True
-                except Exception as error:  # noqa: BLE001
-                    logger.warning(
-                        "maneuver %s failed for patient %d: %s",
-                        condition.key,
-                        case.patient_id,
-                        error,
-                    )
-                    after, usable = float("nan"), False
-                    after_widths = np.full(len(HIDDEN_ORDER), np.nan)
-                    signal = None
+        before_widths = baseline.credible_widths()
+        baseline_correlation = baseline.correlation()
 
-                best = None if signal is None else signal.iloc[0]
+        # The posterior depends on (patient, maneuver) and not on which pair is being
+        # examined, so it is sampled once per maneuver and every pair is read off it.
+        # Sampling per pair would have multiplied the cost by the number of pairs for
+        # identical chains.
+        for condition in conditions:
+            try:
+                posterior = sample_posterior(
+                    case,
+                    surrogates,
+                    (BASELINE, condition),
+                    noise_level,
+                    seed=seed + 977 * case_index,
+                    constants=constants,
+                )
+                after_correlation = posterior.correlation()
+                after_widths = posterior.credible_widths()
+                usable = True
+            except Exception as error:  # noqa: BLE001
+                logger.warning(
+                    "maneuver %s failed for patient %d: %s",
+                    condition.key,
+                    case.patient_id,
+                    error,
+                )
+                after_correlation = np.full((len(HIDDEN_ORDER), len(HIDDEN_ORDER)), np.nan)
+                after_widths = np.full(len(HIDDEN_ORDER), np.nan)
+                usable = False
+
+            for pair in pairs:
+                before = abs(float(baseline_correlation[pair.index_a, pair.index_b]))
+                after = abs(float(after_correlation[pair.index_a, pair.index_b]))
+                best = None
+                if usable:
+                    try:
+                        direction = confounded_direction(baseline, pair)
+                        signal = discriminating_signal(
+                            case, direction, condition, noise_level, constants=constants
+                        )
+                        best = signal.iloc[0]
+                    except Exception as error:  # noqa: BLE001
+                        logger.warning(
+                            "signal calculation failed for patient %d, %s, %s: %s",
+                            case.patient_id, pair, condition.key, error,
+                        )
+
                 detail_rows.append(
                     {
                         "patient_id": case.patient_id,
@@ -218,7 +232,7 @@ def run(
                         "parameter_b": pair.b,
                         "maneuver": condition.provocation.name,
                         "noise_level": noise_level,
-                        "usable": usable,
+                        "usable": usable and best is not None,
                         "correlation_before": before,
                         "correlation_after": after,
                         "correlation_drop": before - after,
@@ -246,54 +260,51 @@ def summarise(detail: pd.DataFrame) -> pd.DataFrame:
     if detail.empty:
         return pd.DataFrame()
 
-    grouped = (
-        detail[detail["usable"]]
-        .groupby(["pair", "maneuver"])
-        .agg(
-            correlation_before=("correlation_before", "median"),
-            correlation_after=("correlation_after", "median"),
-            correlation_drop=("correlation_drop", "median"),
-            ci_shrinkage_a=("ci_shrinkage_a", "median"),
-            ci_shrinkage_b=("ci_shrinkage_b", "median"),
-            median_signal_to_noise=("best_signal_to_noise", "median"),
-            n_patients=("patient_id", "count"),
+    usable = detail[detail["usable"]]
+    records: list[dict[str, object]] = []
+    for (pair_name, maneuver), group in usable.groupby(["pair", "maneuver"]):
+        # The modal discriminating observable, and the signal reported *for that
+        # observable only*. Taking the modal observable and the median signal
+        # independently pairs a value with the wrong units whenever patients disagree on
+        # which observable is best, which is exactly what an earlier version did.
+        modes = group["best_observable"].mode()
+        modal = modes.iat[0] if len(modes) else None
+        matched = group[group["best_observable"] == modal]
+        records.append(
+            {
+                "pair": pair_name,
+                "maneuver": maneuver,
+                "correlation_before": float(group["correlation_before"].median()),
+                "correlation_after": float(group["correlation_after"].median()),
+                "median_paired_drop": float(group["correlation_drop"].median()),
+                "ci_shrinkage_a": float(group["ci_shrinkage_a"].median()),
+                "ci_shrinkage_b": float(group["ci_shrinkage_b"].median()),
+                "modal_best_observable": modal,
+                "median_abs_signal": float(np.median(np.abs(matched["best_signal"]))),
+                "units": (
+                    matched["best_units"].iat[0] if len(matched) else None
+                ),
+                "median_signal_to_noise": float(matched["best_signal_to_noise"].median()),
+                "modal_share": float(len(matched) / max(len(group), 1)),
+                "n_patients": int(len(group)),
+            }
         )
-        .reset_index()
-    )
+    grouped = pd.DataFrame(records)
     coverage = (
         detail.groupby(["pair", "maneuver"])["usable"].mean().rename("usable_fraction")
     )
     grouped = grouped.merge(coverage, on=["pair", "maneuver"])
 
-    best_observable = (
-        detail[detail["usable"]]
-        .groupby(["pair", "maneuver"])["best_observable"]
-        .agg(lambda s: s.mode().iat[0] if len(s.mode()) else None)
-        .rename("modal_best_observable")
-    )
-    grouped = grouped.merge(best_observable, on=["pair", "maneuver"])
-
-    signal_units = (
-        detail[detail["usable"]]
-        .groupby(["pair", "maneuver"])
-        .agg(
-            median_abs_signal=("best_signal", lambda s: float(np.median(np.abs(s)))),
-            units=("best_units", lambda s: s.mode().iat[0] if len(s.mode()) else None),
-        )
-        .reset_index()
-    )
-    grouped = grouped.merge(signal_units, on=["pair", "maneuver"])
-
     rows: list[dict[str, object]] = []
     for pair_name, group in grouped.groupby("pair"):
-        winner = group.loc[group["correlation_drop"].idxmax()]
+        winner = group.loc[group["median_paired_drop"].idxmax()]
         rows.append(
             {
                 "confounded_pair": pair_name,
                 "best_maneuver": winner["maneuver"],
                 "correlation_before": round(float(winner["correlation_before"]), 3),
                 "correlation_after": round(float(winner["correlation_after"]), 3),
-                "correlation_drop": round(float(winner["correlation_drop"]), 3),
+                "correlation_drop": round(float(winner["median_paired_drop"]), 3),
                 "ci_shrinkage_a": round(float(winner["ci_shrinkage_a"]), 3),
                 "ci_shrinkage_b": round(float(winner["ci_shrinkage_b"]), 3),
                 "discriminating_observable": winner["modal_best_observable"],
@@ -304,6 +315,7 @@ def summarise(detail: pd.DataFrame) -> pd.DataFrame:
                     winner["median_signal_to_noise"] >= MIN_SIGNAL_TO_NOISE
                 ),
                 "maneuver_usable_fraction": round(float(winner["usable_fraction"]), 3),
+                "patients_agreeing_on_observable": round(float(winner["modal_share"]), 2),
                 "n_patients": int(winner["n_patients"]),
             }
         )

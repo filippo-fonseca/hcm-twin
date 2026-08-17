@@ -20,16 +20,22 @@ RESEARCH = REPO / "docs" / "research"
 
 VALID_CONFIDENCE = {"measured", "calibrated", "assumed"}
 
-NUMERIC_GUARDS_OUTSIDE_DEFAULTS: dict[str, str] = {
-    "hcmtwin/sarcomere.py": "CA50_FLOOR_UM",
-    "hcmtwin/model.py": "MMHG_ML_TO_JOULE",
-    "hcmtwin/population.py": "DEFAULT_SEED",
+NUMERIC_GUARDS_OUTSIDE_DEFAULTS: dict[str, set[str]] = {
+    "hcmtwin/sarcomere.py": {"CA50_FLOOR_UM"},
+    "hcmtwin/model.py": {"MMHG_ML_TO_JOULE"},
+    "hcmtwin/population.py": {"DEFAULT_SEED"},
+    "hcmtwin/analysis/identifiability.py": {"CONFOUNDING_THRESHOLD"},
+    "hcmtwin/analysis/surrogate.py": {"DEFAULT_DEGREE", "HOLDOUT_FRACTION"},
+    "hcmtwin/analysis/tiebreaker.py": {"MIN_SIGNAL_TO_NOISE"},
+    "hcmtwin/viz/dashboard.py": {"LOOP_POINTS"},
 }
 """Module-level numeric constants allowed to live outside ``defaults.py``.
 
-Each is either a numerical guard with no physiological content, an exact unit conversion,
-or a random seed. Anything else belongs in ``defaults.py`` where it can be given a
-provenance row, and the test below enforces that."""
+Each is a numerical guard, an exact unit conversion, a random seed, or an *analysis
+convention*. None makes a claim about physiology, which is the line this exemption draws:
+a reporting threshold is a choice the reader can disagree with and is stated in the text
+next to the result, whereas a physiological constant is a claim about the world and needs
+a source. Anything that is a claim about the world belongs in ``defaults.py``."""
 
 
 def _module_constants(path: pathlib.Path) -> dict[str, float]:
@@ -153,9 +159,9 @@ def test_no_stray_physiological_constants_outside_defaults() -> None:
         if path.name in {"defaults.py", "units.py"}:
             continue
         relative = str(path.relative_to(REPO / "src"))
-        allowed = NUMERIC_GUARDS_OUTSIDE_DEFAULTS.get(relative)
+        allowed = NUMERIC_GUARDS_OUTSIDE_DEFAULTS.get(relative, set())
         for name in _module_constants(path):
-            if name != allowed:
+            if name not in allowed:
                 offenders.append(f"{relative}:{name}")
     assert not offenders, (
         "numeric constants outside defaults.py with no documented exemption: "
