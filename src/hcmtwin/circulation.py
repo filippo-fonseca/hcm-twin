@@ -26,7 +26,7 @@ from .backend import SCALAR, Backend, Numeric
 
 
 def venous_pressure_mmhg(
-    total_volume_ml: float,
+    total_volume_ml: Numeric,
     cavity_volume_ml: Numeric,
     arterial_pressure_mmhg: Numeric,
     c_art_ml_per_mmhg: float,
@@ -60,7 +60,7 @@ def valve_flow_ml_per_s(
 def systemic_flow_ml_per_s(
     arterial_pressure_mmhg: Numeric,
     venous_pressure_mmhg_value: Numeric,
-    r_sys_mmhg_s_per_ml: float,
+    r_sys_mmhg_s_per_ml: Numeric,
 ) -> Numeric:
     """Flow through the systemic bed, mL/s. Bidirectional: no valve here."""
     return (arterial_pressure_mmhg - venous_pressure_mmhg_value) / r_sys_mmhg_s_per_ml

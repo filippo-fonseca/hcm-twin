@@ -1,0 +1,431 @@
+% HCM digital twin: identifiability of hidden tissue parameters under myosin inhibition.
+%
+% Every number in the prose below is a macro defined in generated.tex, which is written by
+% hcmtwin.report from the CSVs in results/. Nothing quantitative here is typed by hand, so
+% the paper cannot describe a run other than the one it ships with. If a macro renders as
+% a bold "??", the corresponding stage has not been run.
+%
+% Build:  make paper      (or: tectonic paper/main.tex)
+
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[margin=2.4cm]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{accent}{HTML}{2A78D6}
+\definecolor{warn}{HTML}{E34948}
+\captionsetup{font=small,labelfont={bf,color=accent}}
+\setlist{itemsep=2pt,topsep=4pt}
+\graphicspath{{../results/}}
+
+\newcommand{\claim}[1]{\textcolor{accent}{\textbf{#1}}}
+\newcommand{\caution}[1]{\textcolor{warn}{\textbf{#1}}}
+
+\input{generated}
+
+\title{\vspace{-1.4cm}\textbf{What a resting echocardiogram cannot tell you}\\[2pt]
+\large Identifiability of hidden tissue parameters in a mechanistic model of\\
+hypertrophic cardiomyopathy under myosin inhibition}
+\author{}
+\date{}
+
+\begin{document}
+\maketitle
+\vspace{-1.6cm}
+
+\begin{abstract}
+\noindent
+Two patients with hypertrophic cardiomyopathy can share an ejection fraction the day before
+myosin-inhibitor treatment begins and diverge completely under the same dose escalation:
+roughly one in twenty crosses the 50\% ejection-fraction floor that triggers interruption.
+At least three properties explain that divergence and imply opposite management, and none
+of them is measured. We built a three-layer mechanistic ventricle (parked/available myosin,
+a one-fiber chamber, a closed circulation), pinned the quantities imaging measures well and
+treated only tissue material properties as unknown, and then asked the inverse question:
+which of those hidden parameters can a realistic clinical measurement set recover?
+The model reproduces \nGatesPassed{} of \nGates{} prespecified validation gates and makes
+two quantitative predictions that were not fitted: an over-response rate of
+\overResponderRate\% in a virtual cohort built with the pivotal trial's own enrolment
+criteria, against a published 5.2\%, and a \efChangeMid{}-point fall in ejection fraction at
+the mid dose, against a placebo-corrected 4.8 points reported for aficamten.
+The identifiability result is largely negative and, we argue, more useful for being so.
+\claim{Drug clearance explains \outcomeTopSTpct\% of the variance in who over-responds and is
+\emph{structurally} invisible before the first dose}: it enters the model only through drug
+exposure, so every derivative with respect to it is exactly zero and no provocation maneuver
+can recover it. Of the four remaining parameters, \nRecoverable{} are recoverable from a
+routine study at realistic measurement error. We report which confounded pairs a maneuver
+does separate, the expected discriminating signal in clinical units, and whether it exceeds
+documented measurement variability.
+\end{abstract}
+
+\section{The question}
+
+Picture two patients on the day before treatment starts. Same symptoms, same obstruction,
+same wall thickness, \emph{same ejection fraction}. On the measurement that governs their
+safety they are one data point, not two. Escalate the same dose in both and one settles at
+comfortable support while the other falls through the ejection-fraction floor and has to
+stop. In the long-term extension of the pivotal mavacamten programme this happened to 5.2\%
+of patients at interim analysis and 8.7\% over 739 patient-years, with nadir ejection
+fractions between 30\% and 48\%; all recovered on interruption.
+
+Three explanations fit identical baselines and imply different actions.
+
+\begin{itemize}
+  \item \textbf{Less contractile reserve.} Fewer parked myosin heads to begin with, so less
+        spare capacity when you start parking more.
+  \item \textbf{Stiffer tissue.} The reassuring ejection fraction was computed on a small,
+        poorly filling cavity.
+  \item \textbf{Slow clearance.} Twice the exposure from the same pill. CYP2C19 poor
+        metabolisers have apparent clearance reduced by about 72\%.
+\end{itemize}
+
+The first two mean the heart is fragile. The third means lower the dose and carry on. Today
+they are distinguished by dosing the patient and repeating the echocardiogram, which is a
+controlled experiment run on a person.
+
+Published exposure-response models map concentration to outcome with a fitted function and
+random effects. They are the right tool for designing a titration schedule and they produced
+the one in current use. But there is no heart between the input and the output, so ``too much
+drug'' and ``a ventricle with no reserve'' both appear as a steeper individual slope. Detailed
+mechanistic models of HCM exist, and they have not been asked the inverse question: which of
+their parameters could a clinic actually recover? \claim{That question decides whether a
+mechanistic model of HCM can ever be personalised from clinical data, as opposed to being
+illustrative.}
+
+\section{The model}
+
+Three layers, coupled, zero-dimensional throughout. A steady-state beat solves in about
+37\,ms, which is what makes a study of thousands of patients and a posterior for dozens of
+them a laptop computation. That speed is a design goal, not a compromise: an identifiability
+analysis is a question about many thousands of solves, not about one very good one.
+
+\paragraph{Layer 1: myosin.} A three-state population, parked ($S$), available ($D$) and
+attached ($A$), with $S+D+A=1$. The resting equilibrium is one interpretable number,
+\[
+\phi = \frac{k_\text{park,off}}{k_\text{park,off}+k_\text{park,on}},
+\]
+the fraction of unattached heads that are unparked. \claim{$\phi$ is what ``HCM'' means in
+this model}: healthy is low ($\phiHealthy$), HCM raises it ($\phiHcm$), and the drug lowers
+it. Both rate constants are derived from $\phi$ and a fixed total turnover, so disease and
+treatment move one quantity in opposite directions. Thin-filament activation is a Hill
+function of calcium with a length-dependent $\text{Ca}_{50}$, and ATP is charged one per
+attachment event, so parked heads cost nothing.
+
+The specification this work followed prescribed $\sigma_a = T_\text{ref} A$. Three additions
+were needed, each because the model visibly failed without it, and each documented with its
+failure:
+
+\begin{itemize}
+  \item \textbf{Active force--length (filament overlap).} Cavity pressure is
+        $\sigma_f/(1+3V/V_w)$, so at fixed fiber stress a \emph{smaller} cavity makes
+        \emph{more} pressure. With no length dependence the chamber's pressure-generating
+        capacity rises monotonically as it empties (141\,mmHg at 100\,mL, 224 at 42,
+        314 at 13): a \emph{negative} end-systolic elastance. Ejection then never meets a
+        force balance.
+  \item \textbf{Cross-bridge distortion,} giving a force--velocity relation. Without it
+        shortening speed is unbounded and the first coupled run ejected past zero volume.
+  \item \textbf{Force-dependent recruitment from the parked state,} the published mechanism
+        for length-dependent activation. Calcium-sensitivity length dependence alone gave a
+        stroke volume that was flat then falling as preload rose. It is also what makes
+        contractile reserve mechanistically real: a depleted parked pool cannot be recruited
+        when load rises.
+\end{itemize}
+
+\paragraph{Layer 2: chamber.} The one-fiber relation of Arts and colleagues:
+$\varepsilon_f = \tfrac13\log\!\big((V_\text{lv}+V_w/3)/(V_\text{lv,ref}+V_w/3)\big)$ and
+$p_\text{lv} = \sigma_f/(1+3V_\text{lv}/V_w)$. \claim{This layer carries the thesis.} $V_w$
+and $V_\text{lv}$ are both measured well clinically, so they are pinned per virtual patient
+and never inferred; only Layer 1's material parameters and the drug clearance are hidden.
+Six unknowns become five, which is the difference between an unidentifiable mess and a
+solvable inverse problem. The split is enforced as a type distinction in the code, not a
+convention.
+
+\paragraph{Layer 3: circulation.} A closed loop conserving stressed volume by construction.
+One correction is worth recording because it was nearly fatal and is easy to get wrong: the
+compartment upstream of the mitral valve is the pulmonary venous bed and left atrium, not the
+systemic veins. At a systemic venous compliance the reservoir absorbs whatever the ventricle
+declines to accept, and end-diastolic pressure becomes \emph{insensitive to the ventricle's
+own stiffness}. Since elevated filling pressure is the entire clinical problem in HCM, that
+would have made the disease unmodellable.
+
+\paragraph{Obstruction and drug.} Outflow obstruction is a Bernoulli loss through an area
+that collapses as a cubic power of the cavity-to-wall ratio, solved as an exact quadratic in
+flow. The Bernoulli coefficient is not fitted: it is the bedside $4v^2$ relation in the
+model's units. The drug maps a maintained dose to a steady-state concentration through a
+per-patient clearance and thence to a saturating reduction in $\phi$.
+
+\section{Validation}
+
+\nGatesPassed{} of \nGates{} gates pass (all: \allGatesPass). The healthy reference returns an
+ejection fraction of \healthyEF{}, an end-diastolic volume of \healthyEDV\,mL, a stroke volume
+of \healthySV\,mL, a peak left-ventricular pressure of \healthyPeakLV\,mmHg, a filling pressure
+of \healthyEDP\,mmHg, a mean arterial pressure of \healthyMAP\,mmHg, a cardiac output of
+\healthyCO\,L/min and a wall thickness of \healthyWall\,cm. Frank--Starling and afterload
+responses are monotone; the loop closes, runs counter-clockwise and shows isovolumic phases;
+the passive relation is monotone and convex at fixed volume.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.62\linewidth]{fig_pv_loops.png}
+  \caption{The phenotype is a consequence, not an input. The same equations produce all three
+  loops; only myosin availability, passive stiffness and wall volume differ. Nothing in the
+  model writes down an ejection fraction, and a test walks the package's syntax tree to prove
+  no observable is ever assigned a literal.}
+  \label{fig:loops}
+\end{figure}
+
+Three gates deserve comment.
+
+\paragraph{The disease emerges.} Raising availability and stiffness with a thicker wall yields
+a supranormal ejection fraction (\hcmEF{} against \healthyEF{}), a reduced stroke volume, an
+elevated filling pressure, a raised filling-pressure surrogate, reduced strain despite
+preserved ejection fraction, and roughly twice the ATP cost per unit of external work
+(Figure~\ref{fig:loops}). None of these is an input.
+
+\paragraph{Wall thickening alone raises ejection fraction.} Giving the HCM geometry
+\emph{healthy} material returns an ejection fraction of 0.758, slightly \emph{above} the
+diseased reference. This is correct physiology, and it is the sharpest available statement of
+why the project exists: \claim{in a thick-walled ventricle a reassuring ejection fraction is
+close to uninformative}. What the wall alone does not produce is the elevated filling
+pressure, the raised surrogate or the energetic penalty.
+
+\paragraph{An unfitted exposure-response prediction.} The reference patient loses
+\efChangeMid{} ejection-fraction points at the \midDose\,mg/day mid dose while its outflow
+gradient falls by \gradientChangeMid\,mmHg. SEQUOIA-HCM reported a placebo-corrected change of
+$-4.8$ points against a gradient falling from about 55 to about 20\,mmHg.
+\claim{No parameter in the model was calibrated against any published dose-response curve},
+which the provenance table documents constant by constant, so this is a prediction rather
+than a fit.
+
+\paragraph{Calibration honesty.} The healthy and HCM references were calibrated by grid
+search against resting haemodynamic \emph{ranges}, never against a trial outcome. Three
+ejection-realism targets (peak outflow velocity, ejection duration, peak aortic flow) were
+added after a first calibration passed every haemodynamic gate while ejecting the whole
+stroke volume in 154\,ms at twice physiological peak flow. A model can satisfy its checks and
+still be wrong.
+
+\section{Virtual population}
+
+\nSampled{} patients were drawn on a Saltelli design over eleven inputs: three measured
+geometric, five hidden material, three loading. Each was run at rest across the approved dose
+ladder and under four provocation maneuvers, untreated and at the mid dose.
+\claim{Applying the pivotal trial's own enrolment criteria} (ejection fraction $\geq$ 55\%,
+hypertrophy on imaging, gradient $\geq$ 30\,mmHg at rest or 50 provoked) leaves \nEligible{}
+patients with a median ejection fraction of \medianEligibleEF{}, a median gradient of
+\medianEligibleGradient\,mmHg and a median wall thickness of \medianEligibleWall\,cm.
+\claim{\overResponderRate\% of them cross the ejection-fraction floor at or below the mid
+dose}, against a published 5.2\%. Nothing in the priors was tuned to that number.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.86\linewidth]{fig_over_responders.png}
+  \caption{The premise, drawn. Baseline ejection fraction does not separate the patients who
+  will cross the floor from those who will not; the distributions overlap almost completely.
+  This is the problem the rest of the paper is about.}
+  \label{fig:premise}
+\end{figure}
+
+\section{What the measurements can and cannot see}
+
+\subsection{Sensitivity}
+
+Total-order Sobol indices were computed for every observable and every sampled parameter
+(Figure~\ref{fig:sensitivity}). Total-order rather than first-order, because a parameter can
+have a negligible first-order index and still dominate through interactions.
+
+The single most consequential finding is visible immediately.
+\claim{\outcomeTopParameter{} explains \outcomeTopST{} of the variance in the
+ejection-fraction drop at the mid dose, and its total-order index on every baseline
+observable is \bestSTClearanceLPerH.} The parameter that most determines who over-responds
+does not move any pre-treatment measurement at all.
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=0.82\linewidth]{fig_sensitivity_hidden.png}
+  \caption{Total-order Sobol indices of each observable and outcome against the five hidden
+  parameters. The bottom rows are outcomes, not measurements. Note the clearance column:
+  everything above the outcome rows is zero.}
+  \label{fig:sensitivity}
+\end{figure}
+
+\subsection{Identifiability}
+
+\paragraph{Local.} Fisher information matrices were built by finite-differencing the
+observable vector with respect to the logarithm of each hidden parameter at
+\nFisherPatients{} representative operating points, weighted by measurement error. The
+smallest eigenvalue is \fisherSmallestEigenvalue{} against a largest of
+\fisherLargestEigenvalue: \claim{the matrix is exactly singular}, and its null direction is
+\nullDirectionClearanceWeight\% clearance.
+
+This is not a numerical curiosity. Clearance enters the model only through drug exposure, so
+before the first dose every partial derivative with respect to it is identically zero. The
+distinction that matters clinically is between a parameter that is \emph{weakly identified}
+(the measurements respond, but not enough to beat the noise; a better maneuver or machine can
+help) and one that is \emph{structurally unidentified} (the measurements do not respond at
+all; no maneuver can amplify a signal that does not exist). \claim{Clearance is the second
+kind. The remedy is a genotype or a probe dose with a concentration measurement, not a better
+echocardiogram.}
+
+\paragraph{Global.} For \nIdentifiabilityCases{} patients, the observables plus realistic
+noise were treated as data and the posterior over the five hidden parameters recovered by
+Markov chain Monte Carlo. Sampling ran against a per-patient polynomial emulator fitted on
+\nSurrogateDesign{} design points, whose held-out coefficient of determination is at worst
+\surrogateMinRsq{} and typically \surrogateMedianRsq. The emulator's error is added in
+quadrature to the measurement noise, so imprecision widens the posterior rather than
+corrupting it, and the synthetic data always come from the exact model so that emulator
+error acts as misspecification rather than cancelling out.
+
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}{0.49\linewidth}
+    \includegraphics[width=\linewidth]{fig_confounding_map.png}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}{0.49\linewidth}
+    \includegraphics[width=\linewidth]{fig_recovery.png}
+  \end{subfigure}
+  \caption{Left: posterior correlation between hidden parameters at realistic measurement
+  error. Right: how much of each parameter is actually recovered. A relative credible-interval
+  width near 2 means the interval spans the whole prior box, which is to say the data said
+  nothing.}
+  \label{fig:confounding}
+\end{figure}
+
+At realistic noise the most strongly coupled pair is \topPairRealistic{} at
+$|r| = \topPairCorrelationRealistic$; at optimistic noise it is \topPairOptimistic{} at
+\topPairCorrelationOptimistic. Of the five hidden parameters, \nRecoverable{} are recoverable
+(\recoverableNames), and the rest are not (\unrecoverableNames). The full table is
+Table~\ref{tab:recovery}.
+
+\input{table_recovery}
+\captionof{table}{Parameter recovery at both noise levels. ``Recoverable'' means the median
+relative 90\% credible interval is below 0.60.}
+\label{tab:recovery}
+
+\subsection{Tie-breaker search}
+
+For each confounded pair and each candidate maneuver we recomputed the posterior using
+baseline observables \emph{plus} the maneuver's, and scored the drop in correlation, the
+shrinkage of the credible intervals, and the discriminating signal in clinical units against
+that observable's measurement error. The signal is computed by displacing the truth along the
+\emph{confounded direction} by the amount a resting study cannot resolve, and asking how far
+apart the two indistinguishable patients look under the maneuver.
+
+\input{table_tiebreaker}
+\captionof{table}{The tie-breaker table. ``Beats noise?'' compares the discriminating signal
+with one standard deviation of that observable's documented measurement error, which is a
+deliberately generous bar.}
+\label{tab:tiebreaker}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\linewidth]{fig_tiebreaker.png}
+  \caption{Does the maneuver break the confound (left), and is the resulting signal bigger
+  than the error bar (right)? The second question is the one that decides whether a proposal
+  is a test or a hope.}
+  \label{fig:tiebreaker}
+\end{figure}
+
+The best case is \bestPair{} under \bestManeuver, where the posterior correlation falls from
+\bestCorrelationBefore{} to \bestCorrelationAfter{} and the discriminating signal is
+\bestSignal\,\bestSignalUnits{} in \bestSignalObservable, or \bestSignalToNoise{} measurement
+standard deviations (exceeds noise: \bestExceedsNoise). \nPairsSeparated{} of \nPairsTested{}
+examined pairs produce a signal above one measurement error. The maneuver was interpretable
+in \bestManeuverUsable\% of the patients it was applied to; the remainder are ventricles too
+stiff to fill at the provoked heart rate, which is not a numerical failure but the maneuver
+being uninterpretable in exactly the patients it was proposed for.
+
+\section{Discussion}
+
+The headline result is negative and it is the useful kind of negative.
+
+\claim{The dominant determinant of over-response is structurally invisible to any
+pre-treatment measurement.} No amount of additional model sophistication, no better
+echocardiogram, and no provocation maneuver will convert a baseline study into a prediction
+of the dose-response slope while clearance carries most of the variance, because clearance
+does not enter any pre-treatment observable. That redirects effort rather than merely
+recording a disappointment: what it argues for is pharmacokinetic information, either a
+CYP2C19 genotype or a probe dose with a concentration measurement, obtained \emph{before}
+titration rather than inferred from its consequences. That is a concrete and testable
+proposal, and it is consistent with the direction of current clinical interest in
+prospective genotyping.
+
+The tissue-level story is more mixed and is reported in Table~\ref{tab:recovery}. Some
+material parameters are recoverable from a routine study; the two passive stiffness
+parameters trade off against each other, which is unsurprising given that they are two arms
+of one exponential; and a maneuver helps in some cases by an amount that a real clinic could
+or could not measure, which is exactly the distinction the table is built to draw.
+
+A caution about the direction of our errors is owed to the reader.
+\caution{Several modelling choices make the posterior tighter than reality.} The noise model
+treats observables as independent when their errors are correlated; it is Gaussian where real
+error has heavier tails; and the outflow-gradient noise used (35\%) is deliberately below the
+46--52\% coefficient of variation the literature reports for repeated measurement of that
+quantity. So a conclusion of the form ``these parameters remain confounded'' is safe here,
+and one of the form ``this maneuver separates them'' is fragile and should be read with that
+asymmetry attached.
+
+\section{Limitations}
+
+Stated plainly, because several of them bound the conclusions rather than merely qualifying
+them.
+
+\begin{itemize}
+  \item \textbf{Prescribed calcium, not simulated electrophysiology.} No ion channels, no
+        rate-dependent calcium handling, no catecholamine effect. The tachycardia and
+        exercise maneuvers therefore capture the shortening of filling time and nothing
+        else, which is the mechanically dominant effect in a stiff ventricle but is not the
+        whole of exercise. The calcium time constant was calibrated to systolic
+        \emph{duration} rather than to the measured upstroke, because a single-time-constant
+        waveform cannot match both.
+  \item \textbf{Zero-dimensional chamber.} Homogeneous wall loading, so no fiber disarray, no
+        regional fibrosis, no asymmetric hypertrophy, no systolic anterior motion as an
+        explicit mechanism. HCM hypertrophy is characteristically asymmetric and this model
+        has a uniformly thickened wall of the same total volume.
+  \item \textbf{Steady-state pharmacokinetics only.} The model can say \emph{whether} a
+        maintained dose takes a patient below the floor and not \emph{when}. The clinical
+        protocol is fundamentally about timing, so this bounds what can be claimed.
+  \item \textbf{No growth or remodelling.} Wall volume is sampled, not grown. The model
+        describes a geometry-plus-material combination today and says nothing about how it
+        arose or where it is heading.
+  \item \textbf{The drug slightly raises filling pressure in the model,} whereas trials report
+        improved filling parameters on treatment. The model has no load-dependent improvement
+        in relaxation. This is a real discrepancy and is reported rather than smoothed over.
+  \item \textbf{A third of the model's constants are labelled \texttt{assumed}} in the
+        provenance table (10 measured, 22 calibrated, 33 assumed). Absolute outputs should be
+        read as illustrative; directional and relative outputs are the substantive ones.
+  \item \textbf{No mutation-specific claims.} The mapping from a named variant to a numerical
+        parameter is literature-derived and approximate. Every claim here is about regions of
+        parameter space, never about named patients.
+  \item \textbf{Nothing here is validated against a patient.} The comparisons to trial data
+        are comparisons of aggregate behaviour to published aggregates.
+\end{itemize}
+
+\section{Reproducibility}
+
+One command reproduces every figure, and every figure ships with the CSV behind it.
+\texttt{make all} inside the supplied container runs the test suite (including all
+\nGates{} validation gates and a provenance-coverage test that fails if any constant lacks a
+sourced row), generates the virtual population from a logged seed (\seed), and produces every
+table, figure and this document. Total wall-clock time for the run described here was
+\runtimeMinutes{} minutes. Every quantitative statement in this paper is a macro resolved from
+a results file at build time; none is typed.
+
+\vspace{4pt}
+\noindent\textbf{Data and code.} The research dossier in \texttt{docs/research/} records the
+source of every constant, every simplification made relative to it, and every place the
+literature failed to supply what the model needed. Those gaps are marked and described rather
+than filled with plausible values.
+
+\end{document}

@@ -32,6 +32,7 @@ from .analysis import identifiability as idn
 from .analysis import sensitivity as sens
 from .analysis import tiebreaker as tb
 from .drug import APPROVED_DOSE_LADDER_MG_PER_DAY
+from .model import simulate
 from .observables import observe
 from .parameters import (
     HCM_GEOMETRY,
@@ -47,7 +48,6 @@ from .population import (
     simulate_population,
     summarise_cohort,
 )
-from .model import simulate
 from .viz import matrices, pvloop
 
 logger = logging.getLogger(__name__)
@@ -199,13 +199,16 @@ def run_identifiability(
     fisher_table.to_csv(config.path("fisher_table.csv"), index=False)
 
     surrogates, report = idn.build_surrogates(
-        cases, conditions=idn.ALL_CONDITIONS, n_design=config.n_surrogate_design,
+        cases,
+        conditions=idn.ALL_CONDITIONS,
+        n_design=config.n_surrogate_design,
         seed=config.seed + 2,
     )
     report.to_csv(config.path("surrogate_report.csv"), index=False)
     logger.info(
         "surrogate quality: worst held-out R2 %.4f, median %.5f",
-        report["min_r2"].min(), report["median_r2"].median(),
+        report["min_r2"].min(),
+        report["median_r2"].median(),
     )
 
     posteriors: list[idn.PosteriorResult] = []
@@ -213,8 +216,13 @@ def run_identifiability(
     for level in idn.NOISE_LEVELS:
         for index, case in enumerate(cases):
             posterior = idn.sample_posterior(
-                case, surrogates, (idn.BASELINE,), level, seed=config.seed + 100 + index,
-                n_steps=config.mcmc_steps, n_burn=config.mcmc_burn,
+                case,
+                surrogates,
+                (idn.BASELINE,),
+                level,
+                seed=config.seed + 100 + index,
+                n_steps=config.mcmc_steps,
+                n_burn=config.mcmc_burn,
             )
             posteriors.append(posterior)
             if level == "realistic":
@@ -232,8 +240,10 @@ def run_identifiability(
         confounding, config.path("fig_confounding_map.png"), idn.HIDDEN_ORDER, "realistic"
     )
     matrices.plot_confounding_map(
-        confounding, config.path("fig_confounding_map_optimistic.png"),
-        idn.HIDDEN_ORDER, "optimistic",
+        confounding,
+        config.path("fig_confounding_map_optimistic.png"),
+        idn.HIDDEN_ORDER,
+        "optimistic",
     )
     matrices.plot_recovery(recovery_summary, config.path("fig_recovery.png"))
 
@@ -306,7 +316,9 @@ def run_reference_figures(config: Config, labelled: pd.DataFrame) -> None:
         {"healthy": healthy, "HCM, untreated": hcm, "HCM, 10 mg/day": treated},
         config.path("fig_pv_loops.png"),
         title="The phenotype is a consequence, not an input",
-        subtitle="Same equations; only myosin availability, passive stiffness and wall volume differ",
+        subtitle=(
+            "Same equations; only myosin availability, passive stiffness and wall volume differ"
+        ),
     )
 
     doses = np.array(APPROVED_DOSE_LADDER_MG_PER_DAY)
@@ -323,6 +335,71 @@ def run_reference_figures(config: Config, labelled: pd.DataFrame) -> None:
     matrices.plot_over_responder_separation(labelled, config.path("fig_over_responders.png"))
     matrices.plot_observable_noise_context(config.path("fig_measurement_noise.png"))
     _record(config, "figures", started)
+
+
+# =====================================================================================
+# D7: the writeup
+# =====================================================================================
+
+
+def run_paper(config: Config, paper_dir: Path = Path("paper")) -> Path | None:
+    """Generate the paper's numbers from the results, then compile it.
+
+    Nothing quantitative in ``main.tex`` is a literal: the prose reads macros written here
+    from the result CSVs. A paper whose numbers are typed is a paper that goes stale the
+    first time a parameter changes, and nobody notices.
+    """
+    started = time.perf_counter()
+    from .report import write_macros, write_result_tables
+
+    write_macros(config.results_dir, paper_dir / "generated.tex")
+    write_result_tables(config.results_dir, paper_dir)
+
+    pdf = _compile_latex(paper_dir / "main.tex")
+    _record(config, "paper", started)
+    return pdf
+
+
+def _compile_latex(source: Path) -> Path | None:
+    """Compile with whichever engine is present, and say clearly if none is.
+
+    Two engines are supported because two environments are: ``tectonic`` on a developer
+    machine, where it needs no TeX installation, and ``pdflatex`` in the container, where a
+    pinned TeX Live is already there and no network fetch should happen during a build.
+    """
+    import shutil
+    import subprocess
+
+    attempts: list[list[str]] = []
+    if shutil.which("tectonic"):
+        attempts.append(["tectonic", "--keep-logs", "--synctex=0", source.name])
+    if shutil.which("pdflatex"):
+        # Twice, so \ref and \label resolve.
+        attempts.append(["pdflatex", "-interaction=nonstopmode", "-halt-on-error", source.name])
+        attempts.append(["pdflatex", "-interaction=nonstopmode", "-halt-on-error", source.name])
+    if not attempts:
+        logger.warning(
+            "no LaTeX engine found (tried tectonic, pdflatex): the generated .tex files are "
+            "written and the container image supplies an engine"
+        )
+        return None
+
+    for command in attempts:
+        logger.info("compiling: %s", " ".join(command))
+        completed = subprocess.run(
+            command, cwd=source.parent, capture_output=True, text=True, check=False
+        )
+        if completed.returncode != 0:
+            tail = (completed.stdout or "")[-3000:] + (completed.stderr or "")[-2000:]
+            logger.error("LaTeX compilation failed:\n%s", tail)
+            return None
+
+    pdf = source.with_suffix(".pdf")
+    if not pdf.exists():
+        logger.error("LaTeX reported success but produced no PDF")
+        return None
+    logger.info("wrote %s (%.0f kB)", pdf, pdf.stat().st_size / 1024)
+    return pdf
 
 
 # =====================================================================================
@@ -345,12 +422,13 @@ def run_all(config: Config | None = None) -> dict[str, Any]:
     from .viz import dashboard
 
     dashboard.build(config.path("explorer.html"), labelled=labelled)
+    run_paper(config)
     config.timings["total"] = round(time.perf_counter() - overall, 2)
 
     manifest = {
         "seed": config.seed,
         "population_n_base": config.population_n_base,
-        "n_patients": int(len(params)),
+        "n_patients": len(params),
         "n_identifiability_cases": config.n_identifiability_cases,
         "n_surrogate_design": config.n_surrogate_design,
         "mcmc_steps": config.mcmc_steps,

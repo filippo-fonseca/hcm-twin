@@ -31,17 +31,17 @@ import numpy as np
 import pandas as pd
 
 from .. import defaults as d
-from ..drug import effective_phi, steady_state_concentration_ng_per_ml
+from ..analysis.surrogate import Surrogate, latin_hypercube
 from ..model import simulate_cohort
 from ..observables import observe_arrays
 from ..parameters import ModelConstants
-from ..analysis.surrogate import Surrogate, latin_hypercube
 
 logger = logging.getLogger(__name__)
 
 LOOP_POINTS: int = 96
 """How many points of the pressure-volume loop the emulator reproduces."""
 
+# fmt: off
 SLIDERS: tuple[dict[str, object], ...] = (
     {"key": "phi", "label": "Myosin availability", "hint": "fraction of unattached heads that are unparked; HCM raises it",
      "low": 0.28, "high": 0.62, "step": 0.005, "value": 0.55, "units": ""},
@@ -60,6 +60,7 @@ SLIDERS: tuple[dict[str, object], ...] = (
     {"key": "volume", "label": "Stressed blood volume", "hint": "preload; lowering it is the Valsalva maneuver",
      "low": 340.0, "high": 450.0, "step": 1.0, "value": 394.0, "units": "mL"},
 )
+# fmt: on
 
 # The emulator's own inputs. Note phi_eff, not phi and dose: the drug step is exact.
 EMULATOR_INPUTS: tuple[tuple[str, float, float], ...] = (
@@ -89,7 +90,7 @@ def build_emulator(
     n_design: int = 2600,
     seed: int = 20260816,
     constants: ModelConstants | None = None,
-) -> tuple[Surrogate, list[str], dict[str, float]]:
+) -> tuple[Surrogate, list[str], dict[str, object]]:
     """Fit the emulator the page ships with, over the slider ranges.
 
     One cohort solve for the whole design. Returns the surrogate, its output names, and
@@ -122,9 +123,7 @@ def build_emulator(
         logger.warning("emulator design did not fully converge after %d beats", beats)
 
     loops = _loop_traces(design, constants)
-    fields = observe_arrays(
-        summary, wall, np.full(n_design, d.BSA_M2), heart_rate
-    )
+    fields = observe_arrays(summary, wall, np.full(n_design, d.BSA_M2), heart_rate)
     scalar_names = [name for name, _, _, _ in READOUTS]
     scalars = np.column_stack([fields[name] for name in scalar_names])
 
@@ -157,8 +156,11 @@ def _loop_traces(design: np.ndarray, constants: ModelConstants) -> np.ndarray:
         result = simulate(
             MeasuredGeometry(wall_volume_ml=wall, ref_cavity_volume_ml=cavity),
             HiddenMaterial(
-                phi_baseline=phi_eff, a_pas_kpa=a_pas, b_pas=d.B_PAS,
-                ca50_ref_um=d.CA50_REF_UM, clearance_l_per_h=d.DRUG_CL_L_PER_H,
+                phi_baseline=phi_eff,
+                a_pas_kpa=a_pas,
+                b_pas=d.B_PAS,
+                ca50_ref_um=d.CA50_REF_UM,
+                clearance_l_per_h=d.DRUG_CL_L_PER_H,
             ),
             Loading(heart_rate, volume, d.R_SYS_MMHG_S_PER_ML),
             0.0,
@@ -174,17 +176,18 @@ def _loop_traces(design: np.ndarray, constants: ModelConstants) -> np.ndarray:
     return np.hstack([volumes, pressures])
 
 
-def _emulator_payload(surrogate: Surrogate, names: list[str], accuracy: dict[str, float]) -> str:
+def _emulator_payload(surrogate: Surrogate, names: list[str], accuracy: dict[str, object]) -> str:
     def compact(array: np.ndarray) -> list:  # type: ignore[type-arg]
         return [round(float(v), 6) for v in np.asarray(array).ravel()]
 
+    fitted = surrogate.coefficients()
     payload = {
         "inputs": [name for name, _, _ in EMULATOR_INPUTS],
-        "mean": compact(surrogate._mean),  # noqa: SLF001
-        "scale": compact(surrogate._scale),  # noqa: SLF001
-        "powers": [[int(p) for p in row] for row in surrogate._powers],  # noqa: SLF001
-        "coef": compact(surrogate._coef),  # noqa: SLF001
-        "intercept": compact(surrogate._intercept),  # noqa: SLF001
+        "mean": compact(fitted["mean"]),
+        "scale": compact(fitted["scale"]),
+        "powers": [[int(p) for p in row] for row in fitted["powers"]],
+        "coef": compact(fitted["coef"]),
+        "intercept": compact(fitted["intercept"]),
         "nOutputs": len(names),
         "loopPoints": LOOP_POINTS,
         "names": names,

@@ -196,7 +196,7 @@ def run(
                 after_correlation = posterior.correlation()
                 after_widths = posterior.credible_widths()
                 usable = True
-            except Exception as error:  # noqa: BLE001
+            except Exception as error:
                 logger.warning(
                     "maneuver %s failed for patient %d: %s",
                     condition.key,
@@ -218,10 +218,13 @@ def run(
                             case, direction, condition, noise_level, constants=constants
                         )
                         best = signal.iloc[0]
-                    except Exception as error:  # noqa: BLE001
+                    except Exception as error:
                         logger.warning(
                             "signal calculation failed for patient %d, %s, %s: %s",
-                            case.patient_id, pair, condition.key, error,
+                            case.patient_id,
+                            pair,
+                            condition.key,
+                            error,
                         )
 
                 detail_rows.append(
@@ -281,18 +284,14 @@ def summarise(detail: pd.DataFrame) -> pd.DataFrame:
                 "ci_shrinkage_b": float(group["ci_shrinkage_b"].median()),
                 "modal_best_observable": modal,
                 "median_abs_signal": float(np.median(np.abs(matched["best_signal"]))),
-                "units": (
-                    matched["best_units"].iat[0] if len(matched) else None
-                ),
+                "units": (matched["best_units"].iat[0] if len(matched) else None),
                 "median_signal_to_noise": float(matched["best_signal_to_noise"].median()),
                 "modal_share": float(len(matched) / max(len(group), 1)),
-                "n_patients": int(len(group)),
+                "n_patients": len(group),
             }
         )
     grouped = pd.DataFrame(records)
-    coverage = (
-        detail.groupby(["pair", "maneuver"])["usable"].mean().rename("usable_fraction")
-    )
+    coverage = detail.groupby(["pair", "maneuver"])["usable"].mean().rename("usable_fraction")
     grouped = grouped.merge(coverage, on=["pair", "maneuver"])
 
     rows: list[dict[str, object]] = []
@@ -361,12 +360,8 @@ def structural_unidentifiability_note(
         .rename("total_order_on_outcome")
     )
 
-    table = pd.concat([invisible, observable_st, outcome_st], axis=1).reset_index(
-        names="parameter"
-    )
-    table["structurally_invisible_at_baseline"] = (
-        table["max_total_order_on_observables"] < 1e-3
-    )
+    table = pd.concat([invisible, observable_st, outcome_st], axis=1).reset_index(names="parameter")
+    table["structurally_invisible_at_baseline"] = table["max_total_order_on_observables"] < 1e-3
     table["matters_for_outcome"] = table["total_order_on_outcome"] > 0.10
     table["remedy"] = np.where(
         table["structurally_invisible_at_baseline"] & table["matters_for_outcome"],

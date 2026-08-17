@@ -72,9 +72,9 @@ class MeasuredGeometry:
         groups without any of it having been imposed.
         """
         r_inner_cm = (3.0 * cavity_volume_ml / (4.0 * math.pi)) ** (1.0 / 3.0)
-        r_outer_cm = (
-            3.0 * (cavity_volume_ml + self.wall_volume_ml) / (4.0 * math.pi)
-        ) ** (1.0 / 3.0)
+        r_outer_cm = (3.0 * (cavity_volume_ml + self.wall_volume_ml) / (4.0 * math.pi)) ** (
+            1.0 / 3.0
+        )
         return r_outer_cm - r_inner_cm
 
 

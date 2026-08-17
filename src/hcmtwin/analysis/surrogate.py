@@ -52,6 +52,7 @@ class Surrogate:
     _powers: np.ndarray | None = field(default=None, repr=False)
     _coef: np.ndarray | None = field(default=None, repr=False)
     _intercept: np.ndarray | None = field(default=None, repr=False)
+    _constant_outputs: np.ndarray | None = field(default=None, repr=False)
 
     def fit(self, log_params: np.ndarray, outputs: np.ndarray, seed: int = 0) -> Surrogate:
         """Fit on a design, holding out a random split to measure the error.
@@ -92,8 +93,16 @@ class Surrogate:
         residual = predicted - outputs[test_idx]
         self._holdout_rmse = np.sqrt(np.mean(residual**2, axis=0))
         spread = np.std(outputs[test_idx], axis=0)
+        # An output that does not vary across the design has no coefficient of
+        # determination: the denominator is its variance, which is zero. Reporting NaN
+        # says "undefined", where the arithmetic would otherwise report a huge negative
+        # number and look like a catastrophic fit.
+        scale = np.maximum(np.abs(np.mean(outputs[test_idx], axis=0)), 1.0)
+        constant = spread <= 1e-9 * scale
         with np.errstate(divide="ignore", invalid="ignore"):
-            self._holdout_r2 = 1.0 - (self._holdout_rmse**2) / np.maximum(spread**2, 1e-30)
+            r2 = 1.0 - (self._holdout_rmse**2) / (spread**2)
+        self._holdout_r2 = np.where(constant, np.nan, r2)
+        self._constant_outputs = constant
         self._output_scale = spread
 
         # Refit on everything now that the error is measured; the reported error belongs
@@ -150,6 +159,25 @@ class Surrogate:
         monomials = np.prod(gathered, axis=0).T
         return monomials @ self._coef + self._intercept
 
+    def coefficients(self) -> dict[str, np.ndarray]:
+        """The fitted model as plain arrays, for embedding in a page or another runtime.
+
+        A public accessor rather than reaching into the private attributes: anything that
+        has to re-implement ``predict`` elsewhere needs exactly these five arrays, and a
+        named contract is easier to keep correct than a convention.
+        """
+        if self._coef is None or self._powers is None:
+            raise RuntimeError("surrogate has not been fitted")
+        assert self._mean is not None and self._scale is not None
+        assert self._intercept is not None
+        return {
+            "mean": self._mean,
+            "scale": self._scale,
+            "powers": self._powers,
+            "coef": self._coef,
+            "intercept": self._intercept,
+        }
+
     def predict_reference(self, log_params: np.ndarray) -> np.ndarray:
         """Prediction through the original scikit-learn pipeline. Testing only."""
         if self._model is None:
@@ -169,12 +197,23 @@ class Surrogate:
             raise RuntimeError("surrogate has not been fitted")
         return self._holdout_r2
 
-    def error_report(self) -> dict[str, float]:
-        """Worst-case held-out accuracy across outputs, for logging and for the writeup."""
+    def error_report(self) -> dict[str, object]:
+        """Worst-case held-out accuracy across outputs, for logging and for the writeup.
+
+        Constant outputs are excluded from the summary and counted separately, because an
+        undefined coefficient of determination is not a bad one.
+        """
+        r2 = self.holdout_r2
+        defined = np.isfinite(r2)
+        if not defined.any():
+            return {"min_r2": float("nan"), "median_r2": float("nan"),
+                    "worst_output": None, "n_constant_outputs": int(len(r2))}
+        index = int(np.arange(len(r2))[defined][int(np.argmin(r2[defined]))])
         return {
-            "min_r2": float(np.nanmin(self.holdout_r2)),
-            "median_r2": float(np.nanmedian(self.holdout_r2)),
-            "worst_output": self.names[int(np.nanargmin(self.holdout_r2))],
+            "min_r2": float(np.min(r2[defined])),
+            "median_r2": float(np.median(r2[defined])),
+            "worst_output": self.names[index],
+            "n_constant_outputs": int((~defined).sum()),
         }
 
 

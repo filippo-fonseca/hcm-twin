@@ -56,6 +56,11 @@ target-version = "py311"
 select = ["E", "F", "I", "B", "UP", "NPY", "RUF"]
 ignore = ["E741", "RUF002", "RUF003"]
 
+[tool.ruff.lint.per-file-ignores]
+# dashboard.py embeds the explorer's HTML, CSS and JavaScript as a template string.
+# Rewrapping that to Python's line length would make the markup harder to read, not easier.
+"src/hcmtwin/viz/dashboard.py" = ["E501"]
+
 [tool.mypy]
 python_version = "3.12"
 files = ["src/hcmtwin"]

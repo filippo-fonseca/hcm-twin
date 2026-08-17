@@ -13,28 +13,32 @@ paths agree to solver tolerance on a real beat.
 from __future__ import annotations
 
 import math
-from typing import Protocol, TypeVar, Union
+from typing import Protocol
 
 import numpy as np
 
-Numeric = Union[float, np.ndarray]
-T = TypeVar("T", bound=Numeric)
+Numeric = float | np.ndarray
 
 
 class Backend(Protocol):
-    """The operations the model's right-hand side is allowed to use."""
+    """The operations the model's right-hand side is allowed to use.
 
-    def exp(self, x: T) -> T: ...
+    Typed against ``Numeric`` rather than a type variable: a scalar backend cannot honour
+    a promise to return an array for an array, and pretending otherwise would only move
+    the inaccuracy into the type checker's blind spot.
+    """
 
-    def log1p(self, x: T) -> T: ...
+    def exp(self, x: Numeric) -> Numeric: ...
 
-    def sqrt(self, x: T) -> T: ...
+    def log1p(self, x: Numeric) -> Numeric: ...
 
-    def clip(self, x: T, lo: float, hi: float) -> T: ...
+    def sqrt(self, x: Numeric) -> Numeric: ...
 
-    def maximum(self, x: T, lo: float) -> T: ...
+    def clip(self, x: Numeric, lo: float, hi: float) -> Numeric: ...
 
-    def softplus(self, x: T, width: float) -> T:
+    def maximum(self, x: Numeric, lo: float) -> Numeric: ...
+
+    def softplus(self, x: Numeric, width: float) -> Numeric:
         """Smooth, strictly positive approximation to ``max(0, x)``.
 
         ``width * log(1 + exp(x / width))``. As ``width -> 0`` it recovers the hard
@@ -51,22 +55,22 @@ class ScalarBackend:
 
     __slots__ = ()
 
-    def exp(self, x: float) -> float:  # type: ignore[override]
+    def exp(self, x: Numeric) -> Numeric:
         return math.exp(x)
 
-    def log1p(self, x: float) -> float:  # type: ignore[override]
+    def log1p(self, x: Numeric) -> Numeric:
         return math.log1p(x)
 
-    def sqrt(self, x: float) -> float:  # type: ignore[override]
+    def sqrt(self, x: Numeric) -> Numeric:
         return math.sqrt(x)
 
-    def clip(self, x: float, lo: float, hi: float) -> float:  # type: ignore[override]
+    def clip(self, x: Numeric, lo: float, hi: float) -> Numeric:
         return lo if x < lo else (hi if x > hi else x)
 
-    def maximum(self, x: float, lo: float) -> float:  # type: ignore[override]
+    def maximum(self, x: Numeric, lo: float) -> Numeric:
         return x if x > lo else lo
 
-    def softplus(self, x: float, width: float) -> float:  # type: ignore[override]
+    def softplus(self, x: Numeric, width: float) -> Numeric:
         z = x / width
         if z > 30.0:
             return x
@@ -80,22 +84,22 @@ class ArrayBackend:
 
     __slots__ = ()
 
-    def exp(self, x: np.ndarray) -> np.ndarray:  # type: ignore[override]
+    def exp(self, x: Numeric) -> Numeric:
         return np.exp(x)
 
-    def log1p(self, x: np.ndarray) -> np.ndarray:  # type: ignore[override]
+    def log1p(self, x: Numeric) -> Numeric:
         return np.log1p(x)
 
-    def sqrt(self, x: np.ndarray) -> np.ndarray:  # type: ignore[override]
+    def sqrt(self, x: Numeric) -> Numeric:
         return np.sqrt(x)
 
-    def clip(self, x: np.ndarray, lo: float, hi: float) -> np.ndarray:  # type: ignore[override]
+    def clip(self, x: Numeric, lo: float, hi: float) -> Numeric:
         return np.clip(x, lo, hi)
 
-    def maximum(self, x: np.ndarray, lo: float) -> np.ndarray:  # type: ignore[override]
+    def maximum(self, x: Numeric, lo: float) -> Numeric:
         return np.maximum(x, lo)
 
-    def softplus(self, x: np.ndarray, width: float) -> np.ndarray:  # type: ignore[override]
+    def softplus(self, x: Numeric, width: float) -> Numeric:
         z = x / width
         return np.where(z > 30.0, x, width * np.log1p(np.exp(np.minimum(z, 30.0))))
 

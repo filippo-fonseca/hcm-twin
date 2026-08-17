@@ -108,9 +108,7 @@ def test_no_orphan_provenance_rows() -> None:
     constants = _module_constants(DEFAULTS)
     rows = _provenance_rows()
     orphans = sorted(set(rows) - set(constants))
-    assert not orphans, (
-        "provenance rows for constants that no longer exist: " + ", ".join(orphans)
-    )
+    assert not orphans, "provenance rows for constants that no longer exist: " + ", ".join(orphans)
 
 
 def test_provenance_values_match_the_code() -> None:
@@ -215,6 +213,6 @@ def test_every_gap_marker_is_justified() -> None:
             tail = paragraph.split("[GAP]", 1)[1]
             if len(" ".join(tail.split())) < 60:
                 offenders.append(f"{path.name}: paragraph {index}")
-    assert not offenders, (
-        "[GAP] markers with no explanation of what is missing: " + ", ".join(offenders)
+    assert not offenders, "[GAP] markers with no explanation of what is missing: " + ", ".join(
+        offenders
     )

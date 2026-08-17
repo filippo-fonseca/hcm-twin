@@ -56,57 +56,101 @@ class Prior:
 PRIORS: tuple[Prior, ...] = (
     # --- Measured geometry: sampled, then treated as known exactly ------------------
     Prior(
-        "wall_volume_ml", 100.0, 300.0, "measured", "mL",
+        "wall_volume_ml",
+        100.0,
+        300.0,
+        "measured",
+        "mL",
         "105-315 g of myocardium: spans a small normal ventricle through severe "
         "hypertrophy, straddling the 115 g/m^2 upper limit of normal for men.",
     ),
     Prior(
-        "ref_cavity_volume_ml", 45.0, 80.0, "measured", "mL",
+        "ref_cavity_volume_ml",
+        45.0,
+        80.0,
+        "measured",
+        "mL",
         "Unloaded cavity size. Deliberately NOT correlated with wall volume: the small "
         "cavity of HCM has to emerge from stiff tissue refusing to fill, not be assumed.",
     ),
     Prior(
-        "body_surface_area_m2", 1.60, 2.20, "measured", "m^2",
+        "body_surface_area_m2",
+        1.60,
+        2.20,
+        "measured",
+        "m^2",
         "Adult range; needed only to index volumes the way a clinical report does.",
     ),
     # --- Hidden material: sampled, then treated as unknown --------------------------
     Prior(
-        "phi_baseline", 0.28, 0.62, "hidden", "dimensionless",
+        "phi_baseline",
+        0.28,
+        0.62,
+        "hidden",
+        "dimensionless",
         "Unloaded myosin availability. The healthy reference is 0.35 and the HCM "
         "reference 0.55, so the range covers below-normal through severe "
         "hypercontractility.",
     ),
     Prior(
-        "a_pas_kpa", 0.40, 5.50, "hidden", "kPa",
+        "a_pas_kpa",
+        0.40,
+        5.50,
+        "hidden",
+        "kPa",
         "Passive stiffness scale, healthy reference 0.90. The upper end is the "
         "several-fold increase reported for fibrotic hypertrophic myocardium.",
     ),
     Prior(
-        "b_pas", 6.0, 20.0, "hidden", "dimensionless",
+        "b_pas",
+        6.0,
+        20.0,
+        "hidden",
+        "dimensionless",
         "Passive stiffness exponent, healthy reference 10.",
     ),
     Prior(
-        "ca50_ref_um", 0.45, 0.80, "hidden", "uM",
+        "ca50_ref_um",
+        0.45,
+        0.80,
+        "hidden",
+        "uM",
         "Thin-filament calcium sensitivity. This is where thin-filament HCM mutations "
         "act, as distinct from thick-filament mutations which act on phi.",
     ),
     Prior(
-        "clearance_l_per_h", 0.13, 1.10, "hidden", "L/h",
+        "clearance_l_per_h",
+        0.13,
+        1.10,
+        "hidden",
+        "L/h",
         "Apparent drug clearance. Spans CYP2C19 poor metaboliser (about 28% of the "
         "normal-metaboliser value) through rapid metaboliser, an eightfold range in "
         "exposure from the same pill.",
     ),
     # --- Loading --------------------------------------------------------------------
     Prior(
-        "heart_rate_bpm", 52.0, 85.0, "loading", "bpm",
+        "heart_rate_bpm",
+        52.0,
+        85.0,
+        "loading",
+        "bpm",
         "Resting adult range, mostly on background beta-blockade in this population.",
     ),
     Prior(
-        "total_blood_volume_ml", 340.0, 450.0, "loading", "mL",
+        "total_blood_volume_ml",
+        340.0,
+        450.0,
+        "loading",
+        "mL",
         "Stressed blood volume; the reference is 394 mL.",
     ),
     Prior(
-        "systemic_resistance_mmhg_s_per_ml", 0.80, 1.35, "loading", "mmHg*s/mL",
+        "systemic_resistance_mmhg_s_per_ml",
+        0.80,
+        1.35,
+        "loading",
+        "mmHg*s/mL",
         "Systemic vascular resistance; the reference is 1.04.",
     ),
 )
@@ -248,9 +292,7 @@ def simulate_population(
         if provocation.name == REST.name:
             continue
         for dose in (0.0, mid_dose_mg_per_day):
-            logger.info(
-                "simulating cohort: %s, dose=%.1f mg/day", provocation.name, dose
-            )
+            logger.info("simulating cohort: %s, dose=%.1f mg/day", provocation.name, dose)
             frames.append(_simulate_condition(params, dose, provocation, constants))
 
     return pd.concat(frames, ignore_index=True)
@@ -281,15 +323,24 @@ def label_over_responders(
         .any()
         .rename("over_responder")
     )
+    # The same event over the *whole* approved ladder. Published crossing rates are
+    # accumulated over a full titration to the maximum dose across years of follow-up, so
+    # the mid-dose label is the stricter criterion and this is the fairer comparator. Both
+    # are reported; neither is chosen after seeing which matches better.
+    any_dose = rest[rest["dose_mg_per_day"] > 0.0]
+    crossed_any = (
+        any_dose.assign(_below=any_dose["ejection_fraction"] < ef_threshold)
+        .groupby("patient_id")["_below"]
+        .any()
+        .rename("over_responder_any_dose")
+    )
 
     baseline = rest[rest["dose_mg_per_day"] == 0.0].set_index("patient_id")
-    mid = (
-        rest[np.isclose(rest["dose_mg_per_day"], mid_dose_mg_per_day)]
-        .set_index("patient_id")
-    )
+    mid = rest[np.isclose(rest["dose_mg_per_day"], mid_dose_mg_per_day)].set_index("patient_id")
 
     out = baseline.copy()
     out["over_responder"] = crossed.reindex(out.index).fillna(False)
+    out["over_responder_any_dose"] = crossed_any.reindex(out.index).fillna(False)
     out["ef_at_mid_dose"] = mid["ejection_fraction"].reindex(out.index)
     out["ef_drop_at_mid_dose"] = out["ejection_fraction"] - out["ef_at_mid_dose"]
     # The slope the project exists to predict: fractional ejection-fraction loss per
@@ -316,8 +367,7 @@ def label_over_responders(
     # priors was tuned to that rate, so the comparison is a prediction.
     provoked = (
         results[
-            (results["provocation"] == "preload_reduction")
-            & (results["dose_mg_per_day"] == 0.0)
+            (results["provocation"] == "preload_reduction") & (results["dose_mg_per_day"] == 0.0)
         ]
         .set_index("patient_id")["peak_lvot_gradient_mmhg"]
         .reindex(out.index)
@@ -357,17 +407,19 @@ def summarise_cohort(labelled: pd.DataFrame) -> dict[str, float]:
         ),
         "over_responder_rate_usable": float(usable["over_responder"].mean()),
         "over_responder_rate_eligible": float(eligible["over_responder"].mean()),
+        "over_responder_rate_eligible_any_dose": float(eligible["over_responder_any_dose"].mean()),
+        "median_ef_nadir_among_over_responders": float(
+            eligible.loc[eligible["over_responder_any_dose"], "ef_at_mid_dose"].median()
+        )
+        if bool(eligible["over_responder_any_dose"].any())
+        else float("nan"),
         "median_baseline_ef_eligible": float(eligible["ejection_fraction"].median()),
-        "median_ef_drop_at_mid_dose_eligible": float(
-            eligible["ef_drop_at_mid_dose"].median()
-        ),
+        "median_ef_drop_at_mid_dose_eligible": float(eligible["ef_drop_at_mid_dose"].median()),
         "median_baseline_gradient_eligible_mmhg": float(
             eligible["peak_lvot_gradient_mmhg"].median()
         ),
         "median_wall_thickness_eligible_cm": float(eligible["wall_thickness_cm"].median()),
         "obstructive_fraction_eligible": float(
-            (
-                eligible["peak_lvot_gradient_mmhg"] >= d.LVOT_OBSTRUCTIVE_THRESHOLD_MMHG
-            ).mean()
+            (eligible["peak_lvot_gradient_mmhg"] >= d.LVOT_OBSTRUCTIVE_THRESHOLD_MMHG).mean()
         ),
     }

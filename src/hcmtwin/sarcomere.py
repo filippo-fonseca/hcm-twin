@@ -76,7 +76,7 @@ def rates_from_phi(phi: float, k_park_tot_per_s: float) -> MyosinRates:
 
 def ca50_um(
     stretch: Numeric,
-    ca50_ref_um: float,
+    ca50_ref_um: Numeric,
     beta_len: float,
     xp: Backend = SCALAR,
 ) -> Numeric:
@@ -96,7 +96,7 @@ def ca50_um(
 def thin_filament_activation(
     calcium_um_value: Numeric,
     stretch: Numeric,
-    ca50_ref_um: float,
+    ca50_ref_um: Numeric,
     hill_n: float,
     beta_len: float,
     xp: Backend = SCALAR,
@@ -350,14 +350,21 @@ def total_stress_kpa(
 ) -> Numeric:
     """Total fiber stress, kPa: active plus passive."""
     return active_stress_kpa(
-        attached, distortion, stretch, t_ref_kpa, beta_overlap, overlap_max, xb_half,
-        xb_max_gain, xp,
+        attached,
+        distortion,
+        stretch,
+        t_ref_kpa,
+        beta_overlap,
+        overlap_max,
+        xb_half,
+        xb_max_gain,
+        xp,
     ) + passive_stress_kpa(stretch, a_pas_kpa, b_pas, xp)
 
 
-def resting_populations(phi: float, k_att_per_s: float, k_det_per_s: float, n_rest: float) -> tuple[
-    float, float, float
-]:
+def resting_populations(
+    phi: float, k_att_per_s: float, k_det_per_s: float, n_rest: float
+) -> tuple[float, float, float]:
     """Analytic steady state of the three-state scheme at a fixed activation ``n_rest``.
 
     Used only to start the integration close to where it will end up, which cuts several

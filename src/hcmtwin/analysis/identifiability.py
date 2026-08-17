@@ -35,6 +35,7 @@ see how far the conclusions depend on measurement quality rather than on physics
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
 
 import numpy as np
@@ -150,9 +151,9 @@ def select_cases(
     eligible["_stiffness_bin"] = pd.qcut(
         eligible["a_pas_kpa"], q=n_stiffness, labels=False, duplicates="drop"
     )
-    per_cell = max(1, n_cases // max(1, eligible.groupby(
-        ["_thickness_bin", "_stiffness_bin"]
-    ).ngroups))
+    per_cell = max(
+        1, n_cases // max(1, eligible.groupby(["_thickness_bin", "_stiffness_bin"]).ngroups)
+    )
     picked = pd.concat(
         [
             group.sample(min(len(group), per_cell), random_state=seed)
@@ -164,9 +165,7 @@ def select_cases(
         picked = picked.sample(n_cases, random_state=seed).reset_index(drop=True)
     elif len(picked) < n_cases:
         remaining = eligible[~eligible["patient_id"].isin(picked["patient_id"])]
-        extra = remaining.sample(
-            min(len(remaining), n_cases - len(picked)), random_state=seed
-        )
+        extra = remaining.sample(min(len(remaining), n_cases - len(picked)), random_state=seed)
         picked = pd.concat([picked, extra], ignore_index=True)
 
     cases: list[PatientCase] = []
@@ -348,8 +347,9 @@ def build_surrogates(
 
     for condition in conditions:
         factors = condition.provocation.apply(
-            Loading(heart_rate_bpm=1.0, total_blood_volume_ml=1.0,
-                    systemic_resistance_mmhg_s_per_ml=1.0)
+            Loading(
+                heart_rate_bpm=1.0, total_blood_volume_ml=1.0, systemic_resistance_mmhg_s_per_ml=1.0
+            )
         )
         heart_rate = np.array([c.loading.heart_rate_bpm for c in cases])[repeat] * (
             factors.heart_rate_bpm
@@ -357,9 +357,10 @@ def build_surrogates(
         volume = np.array([c.loading.total_blood_volume_ml for c in cases])[repeat] * (
             factors.total_blood_volume_ml
         )
-        resistance = np.array(
-            [c.loading.systemic_resistance_mmhg_s_per_ml for c in cases]
-        )[repeat] * factors.systemic_resistance_mmhg_s_per_ml
+        resistance = (
+            np.array([c.loading.systemic_resistance_mmhg_s_per_ml for c in cases])[repeat]
+            * factors.systemic_resistance_mmhg_s_per_ml
+        )
 
         summary, _, _, converged, beats = simulate_cohort(
             wall_volume_ml=wall,
@@ -376,8 +377,9 @@ def build_surrogates(
             constants=constants,
         )
         if not converged:
-            logger.warning("surrogate design for %s did not fully converge in %d beats",
-                           condition.key, beats)
+            logger.warning(
+                "surrogate design for %s did not fully converge in %d beats", condition.key, beats
+            )
 
         from ..observables import observe_arrays, physiological_mask
 
@@ -394,7 +396,10 @@ def build_surrogates(
             if keep.sum() < 60:
                 logger.warning(
                     "patient %d, %s: only %d/%d design points physiological; skipping",
-                    case.patient_id, condition.key, int(keep.sum()), n_design,
+                    case.patient_id,
+                    condition.key,
+                    int(keep.sum()),
+                    n_design,
                 )
                 report_rows.append(
                     {
@@ -429,7 +434,10 @@ def build_surrogates(
         dropped = int((~physiological).sum())
         logger.info(
             "condition %s: surrogates fitted, %d/%d design solves unphysiological (%.1f%%)",
-            condition.key, dropped, len(physiological), 100.0 * dropped / len(physiological),
+            condition.key,
+            dropped,
+            len(physiological),
+            100.0 * dropped / len(physiological),
         )
 
     return surrogates, pd.DataFrame(report_rows)
@@ -441,7 +449,7 @@ def _log_posterior_factory(
     sigmas: list[np.ndarray],
     lows: np.ndarray,
     highs: np.ndarray,
-):  # type: ignore[no-untyped-def]
+) -> Callable[[np.ndarray], np.ndarray]:
     """Vectorised log-posterior over a batch of walkers.
 
     Uniform priors on the natural scale, matching the population priors exactly, so the
@@ -537,9 +545,7 @@ def sample_posterior(
     start = np.log(case.truth)[None, :] + 0.05 * rng.normal(size=(n_walkers, len(HIDDEN_ORDER)))
     start = np.clip(start, log_lows + 1e-6, log_highs - 1e-6)
 
-    sampler = emcee.EnsembleSampler(
-        n_walkers, len(HIDDEN_ORDER), log_posterior, vectorize=True
-    )
+    sampler = emcee.EnsembleSampler(n_walkers, len(HIDDEN_ORDER), log_posterior, vectorize=True)
     sampler.run_mcmc(start, n_steps, progress=False)
     chain_log = sampler.get_chain(discard=n_burn, thin=thin, flat=True)
     return PosteriorResult(
@@ -573,13 +579,11 @@ def confounding_table(posteriors: list[PosteriorResult]) -> pd.DataFrame:
                         "mean_correlation": float(np.mean(values)),
                         "q25_abs": float(np.percentile(np.abs(values), 25)),
                         "q75_abs": float(np.percentile(np.abs(values), 75)),
-                        "n_patients": int(len(values)),
+                        "n_patients": len(values),
                         "fraction_above_threshold": float(
                             np.mean(np.abs(values) > CONFOUNDING_THRESHOLD)
                         ),
-                        "confounded": bool(
-                            np.median(np.abs(values)) > CONFOUNDING_THRESHOLD
-                        ),
+                        "confounded": bool(np.median(np.abs(values)) > CONFOUNDING_THRESHOLD),
                     }
                 )
     return pd.DataFrame(rows).sort_values(

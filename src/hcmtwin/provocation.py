@@ -112,9 +112,7 @@ def apply_named(name: str, loading: Loading) -> Loading:
     try:
         return BY_NAME[name].apply(loading)
     except KeyError:
-        raise KeyError(
-            f"unknown provocation {name!r}; known: {sorted(BY_NAME)}"
-        ) from None
+        raise KeyError(f"unknown provocation {name!r}; known: {sorted(BY_NAME)}") from None
 
 
 ProvocationFn = Callable[[Loading], Loading]

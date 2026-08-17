@@ -203,9 +203,7 @@ def test_discriminating_signal_is_reported_against_measurement_error(
     direction = np.zeros(len(idn.HIDDEN_ORDER))
     direction[idn.HIDDEN_ORDER.index("a_pas_kpa")] = 0.15
     direction[idn.HIDDEN_ORDER.index("b_pas")] = -0.15
-    signal = tb.discriminating_signal(
-        case, direction, idn.STRESS_CONDITIONS[0], "realistic"
-    )
+    signal = tb.discriminating_signal(case, direction, idn.STRESS_CONDITIONS[0], "realistic")
     assert {"observable", "units", "signal", "measurement_sigma", "signal_to_noise"} <= set(
         signal.columns
     )

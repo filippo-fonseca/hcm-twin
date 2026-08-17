@@ -15,6 +15,7 @@ from .pipeline import (
     Config,
     run_all,
     run_identifiability,
+    run_paper,
     run_population,
     run_reference_figures,
     run_sensitivity,
@@ -34,24 +35,36 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "stage",
         choices=[
-            "all", "validate", "population", "figures", "sensitivity",
-            "identifiability", "tiebreaker", "explorer",
+            "all",
+            "validate",
+            "population",
+            "figures",
+            "sensitivity",
+            "identifiability",
+            "tiebreaker",
+            "explorer",
+            "paper",
         ],
         help="which stage to run",
     )
     parser.add_argument("--results", type=Path, default=Path("results"))
     parser.add_argument(
-        "--n-base", type=int, default=385,
+        "--n-base",
+        type=int,
+        default=385,
         help="Saltelli base size; the cohort is n_base * 13 patients (default 385 = 5005)",
     )
-    parser.add_argument("--cases", type=int, default=50,
-                        help="patients used for the identifiability analysis")
-    parser.add_argument("--design", type=int, default=400,
-                        help="surrogate design points per patient")
+    parser.add_argument(
+        "--cases", type=int, default=50, help="patients used for the identifiability analysis"
+    )
+    parser.add_argument(
+        "--design", type=int, default=400, help="surrogate design points per patient"
+    )
     parser.add_argument("--mcmc-steps", type=int, default=3000)
     parser.add_argument("--seed", type=int, default=20260816)
-    parser.add_argument("--force", action="store_true",
-                        help="rebuild stages whose artifacts already exist")
+    parser.add_argument(
+        "--force", action="store_true", help="rebuild stages whose artifacts already exist"
+    )
     parser.add_argument("--quiet", action="store_true")
     return parser
 
@@ -103,6 +116,8 @@ def main(argv: list[str] | None = None) -> int:
 
         dashboard.build(config.path("explorer.html"), labelled=labelled)
         return 0
+    if args.stage == "paper":
+        return 0 if run_paper(config) is not None else 1
 
     sensitivity = run_sensitivity(config, params, labelled)
     identifiability = run_identifiability(config, params, labelled)

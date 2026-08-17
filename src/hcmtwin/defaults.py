@@ -290,9 +290,15 @@ DOSE_MID_MG_PER_DAY: float = 10.0
 # Solver (hcmtwin.model)
 # --------------------------------------------------------------------------------------
 
-STEPS_PER_BEAT: int = 1200
-"""Fixed integration steps per cardiac cycle, dimensionless. Integration is done in
-normalised beat phase so that this is the same for every heart rate."""
+STEPS_PER_BEAT: int = 400
+"""Fixed integration steps per cardiac cycle, dimensionless.
+
+Integration is in normalised beat phase, so this is the same count at every heart rate.
+Chosen by convergence rather than by feel: at 400 steps every reported observable agrees
+with a 2400-step run to five significant figures, and the peak outflow gradient -- the
+most step-sensitive quantity, because it depends on the square of a flow -- agrees to
+0.05%. ``tests/test_model.py`` re-runs that comparison so the choice cannot silently
+decay."""
 
 MAX_BEATS: int = 40
 """Beat cap for the steady-state search, dimensionless. Reaching it is reported as
@@ -325,6 +331,33 @@ surrogate and nothing else; with the default value a healthy ventricle returns a
 9 cm/s, which is where tissue Doppler puts a normal septal e'."""
 
 # --------------------------------------------------------------------------------------
+# Provocation maneuvers (hcmtwin.provocation)
+# --------------------------------------------------------------------------------------
+
+PROVOCATION_PRELOAD_FACTOR: float = 0.75
+"""Stressed blood volume during the preload-reduction maneuver, as a fraction of resting.
+The Valsalva analogue."""
+
+PROVOCATION_TACHYCARDIA_FACTOR: float = 1.50
+"""Heart rate during the tachycardia maneuver, as a multiple of resting: about 65 to
+about 98 beats per minute."""
+
+PROVOCATION_AFTERLOAD_FACTOR: float = 1.25
+"""Systemic vascular resistance during the handgrip analogue, as a multiple of resting."""
+
+PROVOCATION_EXERCISE_HR_FACTOR: float = 1.85
+"""Heart rate during the combined exercise maneuver, as a multiple of resting: about 65
+to about 120 beats per minute, a submaximal stress-echo workload."""
+
+PROVOCATION_EXERCISE_VOLUME_FACTOR: float = 1.10
+"""Stressed blood volume during exercise, as a multiple of resting: the muscle pump
+recruits volume from the unstressed reservoir."""
+
+PROVOCATION_EXERCISE_RESISTANCE_FACTOR: float = 0.70
+"""Systemic vascular resistance during exercise, as a multiple of resting: exercising
+muscle beds vasodilate."""
+
+# --------------------------------------------------------------------------------------
 # Clinical thresholds
 # --------------------------------------------------------------------------------------
 
@@ -334,3 +367,20 @@ dimensionless."""
 
 LVOT_OBSTRUCTIVE_THRESHOLD_MMHG: float = 30.0
 """Peak outflow gradient defining obstructive HCM, mmHg."""
+
+TRIAL_MIN_EF: float = 0.55
+"""Minimum ejection fraction for trial eligibility, dimensionless."""
+
+TRIAL_MIN_WALL_THICKNESS_CM: float = 1.30
+"""Minimum maximal wall thickness for a diagnosis of hypertrophic cardiomyopathy, cm.
+
+The guideline threshold is 1.5 cm in isolation and 1.3 cm with a family history or a
+positive genotype; the lower figure is used here so that genotype-positive patients with
+milder hypertrophy are not excluded from the virtual cohort."""
+
+TRIAL_MIN_RESTING_GRADIENT_MMHG: float = 30.0
+"""Minimum resting peak outflow gradient for eligibility, mmHg."""
+
+TRIAL_MIN_PROVOKED_GRADIENT_MMHG: float = 50.0
+"""Minimum provoked peak outflow gradient for eligibility, mmHg, when the resting
+gradient is below threshold."""

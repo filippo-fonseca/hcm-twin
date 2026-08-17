@@ -21,6 +21,7 @@ quantitative agreement is reported in the validation table for the reader to jud
 
 from __future__ import annotations
 
+import itertools
 from dataclasses import replace
 
 import pytest
@@ -37,7 +38,8 @@ from hcmtwin import (
 )
 from hcmtwin import defaults as d
 from hcmtwin.drug import APPROVED_DOSE_LADDER_MG_PER_DAY
-from hcmtwin.validation import HEALTHY_GATES, exposure_response_comparison as _exposure
+from hcmtwin.validation import HEALTHY_GATES
+from hcmtwin.validation import exposure_response_comparison as _exposure
 
 GATES: dict[str, tuple[float, float]] = {
     name: (low, high) for name, (low, high, _units) in HEALTHY_GATES.items()
@@ -96,8 +98,8 @@ def test_frank_starling_is_monotone() -> None:
         observed, _ = _run(HEALTHY_GEOMETRY, HEALTHY_MATERIAL, loading)
         edvs.append(observed.edv_ml)
         svs.append(observed.stroke_volume_ml)
-    assert all(b > a for a, b in zip(edvs, edvs[1:], strict=False)), f"EDV not monotone: {edvs}"
-    assert all(b > a for a, b in zip(svs, svs[1:], strict=False)), f"SV not monotone: {svs}"
+    assert all(b > a for a, b in itertools.pairwise(edvs)), f"EDV not monotone: {edvs}"
+    assert all(b > a for a, b in itertools.pairwise(svs)), f"SV not monotone: {svs}"
 
 
 # ======================================================================================
@@ -112,8 +114,8 @@ def test_afterload_lowers_stroke_volume_and_raises_esv() -> None:
         observed, _ = _run(HEALTHY_GEOMETRY, HEALTHY_MATERIAL, loading)
         svs.append(observed.stroke_volume_ml)
         esvs.append(observed.esv_ml)
-    assert all(b < a for a, b in zip(svs, svs[1:], strict=False)), f"SV not falling: {svs}"
-    assert all(b > a for a, b in zip(esvs, esvs[1:], strict=False)), f"ESV not rising: {esvs}"
+    assert all(b < a for a, b in itertools.pairwise(svs)), f"SV not falling: {svs}"
+    assert all(b > a for a, b in itertools.pairwise(esvs)), f"ESV not rising: {esvs}"
 
 
 # ======================================================================================
@@ -196,7 +198,7 @@ def test_stiffer_tissue_raises_pressure_at_fixed_volume() -> None:
         cavity_pressure_mmhg(passive_stress_kpa(stretch, a, d.B_PAS), volume, d.V_W_HEALTHY_ML)
         for a in (0.6, 0.9, 1.5, 2.5, 4.0)
     ]
-    assert all(b > a for a, b in zip(pressures, pressures[1:], strict=False)), pressures
+    assert all(b > a for a, b in itertools.pairwise(pressures)), pressures
 
 
 def test_stiffer_tissue_raises_end_diastolic_pressure_in_the_coupled_model() -> None:
@@ -205,7 +207,7 @@ def test_stiffer_tissue_raises_end_diastolic_pressure_in_the_coupled_model() -> 
         material = replace(HEALTHY_MATERIAL, a_pas_kpa=a_pas)
         observed, _ = _run(HEALTHY_GEOMETRY, material, RESTING_LOADING)
         edps.append(observed.end_diastolic_pressure_mmhg)
-    assert all(b > a for a, b in zip(edps, edps[1:], strict=False)), edps
+    assert all(b > a for a, b in itertools.pairwise(edps)), edps
 
 
 # ======================================================================================
@@ -305,7 +307,7 @@ def test_dose_lowers_ejection_fraction_monotonically() -> None:
         _run(HCM_GEOMETRY, HCM_MATERIAL, RESTING_LOADING, dose)[0].ejection_fraction
         for dose in APPROVED_DOSE_LADDER_MG_PER_DAY
     ]
-    assert all(b < a for a, b in zip(efs, efs[1:], strict=False)), f"EF not monotone: {efs}"
+    assert all(b < a for a, b in itertools.pairwise(efs)), f"EF not monotone: {efs}"
 
 
 def test_dose_lowers_peak_gradient_monotonically() -> None:
@@ -313,7 +315,7 @@ def test_dose_lowers_peak_gradient_monotonically() -> None:
         _run(HCM_GEOMETRY, HCM_MATERIAL, RESTING_LOADING, dose)[0].peak_lvot_gradient_mmhg
         for dose in APPROVED_DOSE_LADDER_MG_PER_DAY
     ]
-    assert all(b < a for a, b in zip(gradients, gradients[1:], strict=False)), gradients
+    assert all(b < a for a, b in itertools.pairwise(gradients)), gradients
 
 
 def test_drug_lowers_availability_and_energy_cost() -> None:
@@ -321,9 +323,9 @@ def test_drug_lowers_availability_and_energy_cost() -> None:
     untreated, untreated_result = _run(HCM_GEOMETRY, HCM_MATERIAL, RESTING_LOADING, 0.0)
     treated, treated_result = _run(HCM_GEOMETRY, HCM_MATERIAL, RESTING_LOADING, 15.0)
     assert treated_result.phi_effective < untreated_result.phi_effective
-    assert (
-        treated_result.summary.atp_per_head < untreated_result.summary.atp_per_head
-    ), "a myosin inhibitor must lower ATP consumption per head"
+    assert treated_result.summary.atp_per_head < untreated_result.summary.atp_per_head, (
+        "a myosin inhibitor must lower ATP consumption per head"
+    )
     assert treated.peak_lvot_gradient_mmhg < untreated.peak_lvot_gradient_mmhg
 
 

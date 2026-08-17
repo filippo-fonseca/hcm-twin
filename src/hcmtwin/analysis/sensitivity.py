@@ -135,8 +135,12 @@ def spearman_panel(
             else:
                 rho, p_value = spearmanr(x[finite], y[finite])
             rows.append(
-                {"quantity": column, "parameter": name, "spearman": float(rho),
-                 "p_value": float(p_value)}
+                {
+                    "quantity": column,
+                    "parameter": name,
+                    "spearman": float(rho),
+                    "p_value": float(p_value),
+                }
             )
     return pd.DataFrame(rows)
 
@@ -191,9 +195,7 @@ def summarise(sobol: pd.DataFrame) -> pd.DataFrame:
     for name, group in measurable.groupby("parameter"):
         routine = group[group["quantity"].map(lambda q: SPECS[q].routine and not SPECS[q].invasive)]
         best = group.loc[group["ST"].idxmax()]
-        best_routine = (
-            routine.loc[routine["ST"].idxmax()] if len(routine) else None
-        )
+        best_routine = routine.loc[routine["ST"].idxmax()] if len(routine) else None
         rows.append(
             {
                 "parameter": name,

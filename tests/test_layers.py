@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import itertools
 import math
 
 import numpy as np
@@ -80,10 +81,19 @@ def test_phi_outside_the_open_interval_is_rejected(phi: float) -> None:
 
 def test_derivatives_sum_to_zero() -> None:
     derivs = sarcomere.derivatives(
-        0.5, 0.3, 0.2, 0.7, 1.05, 30.0,
+        0.5,
+        0.3,
+        0.2,
+        0.7,
+        1.05,
+        30.0,
         *sarcomere.rates_from_phi(0.4, d.K_PARK_TOT_PER_S),
-        d.K_ATT_PER_S, d.K_DET_PER_S, d.K_FORCE_PER_KPA,
-        d.CA50_REF_UM, d.HILL_N, d.BETA_LEN,
+        d.K_ATT_PER_S,
+        d.K_DET_PER_S,
+        d.K_FORCE_PER_KPA,
+        d.CA50_REF_UM,
+        d.HILL_N,
+        d.BETA_LEN,
     )
     assert derivs.ds_dt + derivs.dd_dt + derivs.da_dt == pytest.approx(0.0, abs=1e-12)
 
@@ -93,7 +103,7 @@ def test_activation_is_sigmoidal_in_calcium() -> None:
         sarcomere.thin_filament_activation(ca, 1.0, d.CA50_REF_UM, d.HILL_N, d.BETA_LEN)
         for ca in (0.05, 0.2, 0.6, 1.5, 5.0)
     ]
-    assert all(b > a for a, b in zip(values, values[1:], strict=False))
+    assert all(b > a for a, b in itertools.pairwise(values))
     assert values[2] == pytest.approx(0.5, abs=1e-9), "Ca50 must be the half-activation point"
     assert values[0] < 0.05 and values[-1] > 0.95
 
@@ -153,7 +163,13 @@ def test_unloaded_shortening_velocity_matches_its_definition() -> None:
     v_max = d.K_XB_PER_S * d.XB_HALF
     distortion = -v_max / d.K_XB_PER_S
     stress = sarcomere.active_stress_kpa(
-        0.4, distortion, 1.0, d.T_REF_KPA, d.BETA_OVERLAP, d.OVERLAP_MAX, d.XB_HALF,
+        0.4,
+        distortion,
+        1.0,
+        d.T_REF_KPA,
+        d.BETA_OVERLAP,
+        d.OVERLAP_MAX,
+        d.XB_HALF,
         d.XB_MAX_GAIN,
     )
     assert stress == pytest.approx(0.0, abs=1e-12)
@@ -165,11 +181,13 @@ def test_force_recruitment_is_monotone_and_neutral_at_zero_load() -> None:
     values = [
         sarcomere.force_recruitment_factor(s, d.K_FORCE_PER_KPA) for s in (0.0, 10.0, 30.0, 60.0)
     ]
-    assert all(b > a for a, b in zip(values, values[1:], strict=False))
+    assert all(b > a for a, b in itertools.pairwise(values))
 
 
 def test_resting_populations_satisfy_the_constraint() -> None:
-    parked, available, attached = sarcomere.resting_populations(0.35, d.K_ATT_PER_S, d.K_DET_PER_S, 0.01)
+    parked, available, attached = sarcomere.resting_populations(
+        0.35, d.K_ATT_PER_S, d.K_DET_PER_S, 0.01
+    )
     assert parked + available + attached == pytest.approx(1.0, rel=1e-12)
     assert available / (parked + available) == pytest.approx(0.35, rel=1e-9)
 
@@ -267,14 +285,18 @@ def test_lvot_area_shrinks_as_the_cavity_crowds() -> None:
         )
         for v in (90.0, 60.0, 40.0, 20.0)
     ]
-    assert all(b < a for a, b in zip(areas, areas[1:], strict=False)), areas
+    assert all(b < a for a, b in itertools.pairwise(areas)), areas
     assert areas[0] == pytest.approx(d.A0_LVOT_CM2), "a well-filled cavity must be wide open"
 
 
 def test_healthy_geometry_never_narrows_during_high_flow() -> None:
     """A structurally normal ventricle stays open through mid-ejection."""
     area = obstruction.lvot_area_cm2(
-        75.0, d.V_W_HEALTHY_ML, d.A0_LVOT_CM2, d.CROWDING_REF, d.LVOT_EXPONENT,
+        75.0,
+        d.V_W_HEALTHY_ML,
+        d.A0_LVOT_CM2,
+        d.CROWDING_REF,
+        d.LVOT_EXPONENT,
         d.A_MIN_FRAC_LVOT,
     )
     assert area == pytest.approx(d.A0_LVOT_CM2)
@@ -303,9 +325,7 @@ def test_gradient_is_the_bernoulli_relation() -> None:
     area_cm2 = 1.2
     velocity_m_per_s = 3.0
     flow_ml_per_s = velocity_m_per_s * 100.0 * area_cm2
-    gradient = obstruction.lvot_gradient_mmhg(
-        flow_ml_per_s, area_cm2, d.K_OBS_MMHG_S2_CM4_PER_ML2
-    )
+    gradient = obstruction.lvot_gradient_mmhg(flow_ml_per_s, area_cm2, d.K_OBS_MMHG_S2_CM4_PER_ML2)
     assert gradient == pytest.approx(4.0 * velocity_m_per_s**2, rel=1e-9)
 
 
@@ -322,9 +342,7 @@ def test_steady_state_concentration_units() -> None:
 
 def test_slow_metabolisers_get_more_exposure() -> None:
     normal = drug.steady_state_concentration_ng_per_ml(5.0, d.DRUG_CL_L_PER_H)
-    poor = drug.steady_state_concentration_ng_per_ml(
-        5.0, d.DRUG_CL_L_PER_H * d.DRUG_CL_PM_FRACTION
-    )
+    poor = drug.steady_state_concentration_ng_per_ml(5.0, d.DRUG_CL_L_PER_H * d.DRUG_CL_PM_FRACTION)
     assert poor / normal == pytest.approx(1.0 / d.DRUG_CL_PM_FRACTION, rel=1e-9)
     assert poor / normal > 3.0
 

@@ -35,7 +35,7 @@ import numpy as np
 
 from . import defaults as d
 from .chamber import wall_thickness_cm
-from .model import MMHG_ML_TO_JOULE, BeatResult
+from .model import MMHG_ML_TO_JOULE, BeatResult, BeatSummary
 from .parameters import HiddenMaterial, Loading, MeasuredGeometry
 
 NoiseKind = Literal["absolute", "relative"]
@@ -83,9 +83,7 @@ SPECS: dict[str, ObservableSpec] = {
     "stroke_volume_ml": ObservableSpec(
         "mL", "echocardiography (EDV - ESV)", "relative", 0.12, 0.07, derived=True
     ),
-    "ejection_fraction": ObservableSpec(
-        "fraction", "echocardiography", "absolute", 0.050, 0.030
-    ),
+    "ejection_fraction": ObservableSpec("fraction", "echocardiography", "absolute", 0.050, 0.030),
     "wall_thickness_cm": ObservableSpec(
         "cm", "2D echocardiography, parasternal long axis", "absolute", 0.10, 0.06
     ),
@@ -120,9 +118,7 @@ SPECS: dict[str, ObservableSpec] = {
         0.05,
     ),
     # --- Systemic -----------------------------------------------------------------
-    "mean_arterial_pressure_mmhg": ObservableSpec(
-        "mmHg", "brachial cuff", "absolute", 5.0, 3.0
-    ),
+    "mean_arterial_pressure_mmhg": ObservableSpec("mmHg", "brachial cuff", "absolute", 5.0, 3.0),
     "cardiac_output_l_per_min": ObservableSpec(
         "L/min", "Doppler LVOT velocity-time integral x area x heart rate", "relative", 0.12, 0.08
     ),
@@ -132,7 +128,11 @@ SPECS: dict[str, ObservableSpec] = {
         "1/cm", "echocardiography (derived)", "relative", 0.12, 0.07, derived=True
     ),
     "stroke_volume_index_ml_per_m2": ObservableSpec(
-        "mL/m^2", "echocardiography indexed to body surface area", "relative", 0.12, 0.07,
+        "mL/m^2",
+        "echocardiography indexed to body surface area",
+        "relative",
+        0.12,
+        0.07,
         derived=True,
     ),
     "stroke_work_j": ObservableSpec(
@@ -291,19 +291,41 @@ OBSERVABLE_NAMES: tuple[str, ...] = tuple(f.name for f in fields(Observables))
 HIDDEN_NAMES: tuple[str, ...] = tuple(f.name for f in fields(HiddenTruth))
 
 NONINVASIVE_ROUTINE_NAMES: tuple[str, ...] = tuple(
-    name
-    for name in OBSERVABLE_NAMES
-    if not SPECS[name].invasive and SPECS[name].routine
+    name for name in OBSERVABLE_NAMES if not SPECS[name].invasive and SPECS[name].routine
 )
 """The default feature set: what an ordinary outpatient echo visit produces."""
 
+UNINFORMATIVE_NAMES: frozenset[str] = frozenset({"heart_rate_bpm", "lv_mass_g"})
+"""Observables that carry no information about the hidden parameters.
+
+Heart rate is *reported* by any real study and is a genuine observable, but in this model
+it is an input the analyst already knows exactly: it is a field of ``Loading``, it is
+identical for every candidate parameter vector, and no posterior can learn anything from
+it. Leaving it in the likelihood adds a term that is exactly zero for every sample.
+
+It also breaks the surrogate's own diagnostics, which is how it was found: a coefficient of
+determination is one minus the error variance over the *output* variance, and for a
+constant output that denominator is zero. A handful of emulators reported an R-squared of
+minus two hundred thousand, which looks like catastrophe and was floating-point noise
+divided by nothing.
+
+Left-ventricular mass is excluded for the same reason and it is the more interesting case.
+It is a real measurement, and it is *the* measurement that defines the disease on imaging.
+But in this project's framing wall volume is pinned as known, and mass is wall volume times
+a density constant, so conditional on the geometry it is already determined and can
+contribute nothing further about the tissue. That is not a defect of the measurement; it is
+the whole point of separating shape from material."""
+
 INDEPENDENT_NOISE_NAMES: tuple[str, ...] = tuple(
-    name for name in NONINVASIVE_ROUTINE_NAMES if not SPECS[name].derived
+    name
+    for name in NONINVASIVE_ROUTINE_NAMES
+    if not SPECS[name].derived and name not in UNINFORMATIVE_NAMES
 )
 """The subset used in the identifiability likelihood.
 
 Derived fields are dropped so that one measurement is not counted several times under
-different names, which would shrink the posterior for free."""
+different names, which would shrink the posterior for free. Uninformative fields are
+dropped because they cannot constrain anything."""
 
 
 def _safe_divide(
@@ -321,7 +343,7 @@ def _safe_divide(
 
 
 def observe_arrays(
-    summary: object,
+    summary: BeatSummary,
     wall_volume_ml: np.ndarray,
     body_surface_area_m2: np.ndarray,
     heart_rate_bpm: np.ndarray,
@@ -332,24 +354,23 @@ def observe_arrays(
     cannot drift apart in the way two hand-written copies of the same arithmetic would.
     """
     s = summary
-    edv = np.asarray(s.edv_ml, dtype=float)  # type: ignore[attr-defined]
-    esv = np.asarray(s.esv_ml, dtype=float)  # type: ignore[attr-defined]
+    edv = np.asarray(s.edv_ml, dtype=float)
+    esv = np.asarray(s.esv_ml, dtype=float)
     stroke_volume = edv - esv
-    stroke_work = np.asarray(s.stroke_work_mmhg_ml, dtype=float) * MMHG_ML_TO_JOULE  # type: ignore[attr-defined]
+    stroke_work = np.asarray(s.stroke_work_mmhg_ml, dtype=float) * MMHG_ML_TO_JOULE
     thickness = wall_thickness_cm(edv, wall_volume_ml)
 
     # E wave: the Doppler velocity implied by the peak atrioventricular pressure gradient,
     # via the same simplified Bernoulli relation (dp = 4 v^2, v in m/s) a sonographer uses.
     # The factor of 100 converts m/s to cm/s.
     transmitral = np.maximum(
-        np.asarray(s.peak_transmitral_gradient_mmhg, dtype=float), 0.0  # type: ignore[attr-defined]
+        np.asarray(s.peak_transmitral_gradient_mmhg, dtype=float),
+        0.0,
     )
     e_wave_cm_per_s = 100.0 * np.sqrt(transmitral / 4.0)
     # e' wave: peak myocardial lengthening rate, scaled to an annular velocity.
-    e_prime_cm_per_s = (
-        np.asarray(s.peak_lengthening_rate_per_s, dtype=float) * d.ANNULUS_LENGTH_CM  # type: ignore[attr-defined]
-    )
-    atp_au = np.asarray(s.atp_per_head, dtype=float) * wall_volume_ml  # type: ignore[attr-defined]
+    e_prime_cm_per_s = np.asarray(s.peak_lengthening_rate_per_s, dtype=float) * d.ANNULUS_LENGTH_CM
+    atp_au = np.asarray(s.atp_per_head, dtype=float) * wall_volume_ml
 
     return {
         "edv_ml": edv,
@@ -358,15 +379,17 @@ def observe_arrays(
         "ejection_fraction": _safe_divide(stroke_volume, edv),
         "wall_thickness_cm": thickness,
         "lv_mass_g": wall_volume_ml * d.MYOCARDIUM_DENSITY_G_PER_ML,
-        "peak_lvot_gradient_mmhg": np.asarray(s.peak_lvot_gradient_mmhg, dtype=float),  # type: ignore[attr-defined]
+        "peak_lvot_gradient_mmhg": np.asarray(s.peak_lvot_gradient_mmhg, dtype=float),
         "end_diastolic_pressure_mmhg": np.asarray(
-            s.end_diastolic_pressure_mmhg, dtype=float  # type: ignore[attr-defined]
+            s.end_diastolic_pressure_mmhg,
+            dtype=float,
         ),
         "e_over_e_prime": _safe_divide(e_wave_cm_per_s, e_prime_cm_per_s),
-        "peak_strain_amplitude": np.asarray(s.peak_strain - s.min_strain, dtype=float),  # type: ignore[attr-defined]
-        "mean_arterial_pressure_mmhg": np.asarray(s.mean_arterial_mmhg, dtype=float),  # type: ignore[attr-defined]
+        "peak_strain_amplitude": np.asarray(s.peak_strain - s.min_strain, dtype=float),
+        "mean_arterial_pressure_mmhg": np.asarray(s.mean_arterial_mmhg, dtype=float),
         "cardiac_output_l_per_min": np.asarray(
-            s.mean_systemic_flow_ml_per_s, dtype=float  # type: ignore[attr-defined]
+            s.mean_systemic_flow_ml_per_s,
+            dtype=float,
         )
         * 60.0
         / 1000.0,
@@ -417,7 +440,7 @@ def observe(
 
 
 def hidden_truth_arrays(
-    summary: object,
+    summary: BeatSummary,
     phi_baseline: np.ndarray,
     phi_effective: np.ndarray,
     a_pas_kpa: np.ndarray,
@@ -436,9 +459,9 @@ def hidden_truth_arrays(
         "ca50_ref_um": np.asarray(ca50_ref_um, dtype=float),
         "clearance_l_per_h": np.asarray(clearance_l_per_h, dtype=float),
         "concentration_ng_per_ml": np.asarray(concentration_ng_per_ml, dtype=float),
-        "peak_attached_fraction": np.asarray(s.peak_attached, dtype=float),  # type: ignore[attr-defined]
-        "contractile_reserve": np.asarray(s.mean_parked, dtype=float),  # type: ignore[attr-defined]
-        "atp_per_head_per_beat": np.asarray(s.atp_per_head, dtype=float),  # type: ignore[attr-defined]
+        "peak_attached_fraction": np.asarray(s.peak_attached, dtype=float),
+        "contractile_reserve": np.asarray(s.mean_parked, dtype=float),
+        "atp_per_head_per_beat": np.asarray(s.atp_per_head, dtype=float),
     }
 
 

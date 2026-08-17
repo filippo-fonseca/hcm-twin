@@ -35,7 +35,10 @@ def test_step_count_is_converged() -> None:
     """
     coarse = observe(
         simulate(
-            HEALTHY_GEOMETRY, HEALTHY_MATERIAL, RESTING_LOADING, 0.0,
+            HEALTHY_GEOMETRY,
+            HEALTHY_MATERIAL,
+            RESTING_LOADING,
+            0.0,
             constants=ModelConstants(steps_per_beat=400),
         ),
         HEALTHY_GEOMETRY,
@@ -43,7 +46,10 @@ def test_step_count_is_converged() -> None:
     )
     fine = observe(
         simulate(
-            HEALTHY_GEOMETRY, HEALTHY_MATERIAL, RESTING_LOADING, 0.0,
+            HEALTHY_GEOMETRY,
+            HEALTHY_MATERIAL,
+            RESTING_LOADING,
+            0.0,
             constants=ModelConstants(steps_per_beat=2400),
         ),
         HEALTHY_GEOMETRY,
@@ -55,9 +61,7 @@ def test_step_count_is_converged() -> None:
     assert coarse.end_diastolic_pressure_mmhg == pytest.approx(
         fine.end_diastolic_pressure_mmhg, rel=1e-3
     )
-    assert coarse.peak_lvot_gradient_mmhg == pytest.approx(
-        fine.peak_lvot_gradient_mmhg, rel=5e-3
-    )
+    assert coarse.peak_lvot_gradient_mmhg == pytest.approx(fine.peak_lvot_gradient_mmhg, rel=5e-3)
 
 
 def test_end_diastolic_volume_agrees_with_the_peak_of_the_beat() -> None:
@@ -79,7 +83,10 @@ def test_end_diastolic_volume_agrees_with_the_peak_of_the_beat() -> None:
 
 def test_non_convergence_is_reported_not_hidden() -> None:
     starved = simulate(
-        HEALTHY_GEOMETRY, HEALTHY_MATERIAL, RESTING_LOADING, 0.0,
+        HEALTHY_GEOMETRY,
+        HEALTHY_MATERIAL,
+        RESTING_LOADING,
+        0.0,
         constants=ModelConstants(max_beats=2),
     )
     assert not starved.converged, "a run that hit the beat cap must say so"
@@ -88,7 +95,10 @@ def test_non_convergence_is_reported_not_hidden() -> None:
 def test_tighter_tolerance_does_not_move_the_answer() -> None:
     loose = simulate(HEALTHY_GEOMETRY, HEALTHY_MATERIAL, RESTING_LOADING, 0.0)
     tight = simulate(
-        HEALTHY_GEOMETRY, HEALTHY_MATERIAL, RESTING_LOADING, 0.0,
+        HEALTHY_GEOMETRY,
+        HEALTHY_MATERIAL,
+        RESTING_LOADING,
+        0.0,
         constants=ModelConstants(steady_tol_ml=1e-4, steady_tol_mmhg=1e-4, max_beats=120),
     )
     assert float(loose.summary.edv_ml) == pytest.approx(float(tight.summary.edv_ml), rel=1e-3)
@@ -134,10 +144,9 @@ def test_cohort_result_is_independent_of_who_it_is_batched_with() -> None:
     with a slow one takes more beats. At a fixed point that must change nothing, and this
     is the test that says so.
     """
+
     def run(n_extra: int) -> float:
-        wall = np.concatenate(
-            [[HCM_GEOMETRY.wall_volume_ml], np.linspace(110.0, 290.0, n_extra)]
-        )
+        wall = np.concatenate([[HCM_GEOMETRY.wall_volume_ml], np.linspace(110.0, 290.0, n_extra)])
         size = len(wall)
         summary, _, _, _, _ = simulate_cohort(
             wall_volume_ml=wall,
@@ -149,9 +158,7 @@ def test_cohort_result_is_independent_of_who_it_is_batched_with() -> None:
             clearance_l_per_h=np.full(size, HCM_MATERIAL.clearance_l_per_h),
             heart_rate_bpm=np.full(size, RESTING_LOADING.heart_rate_bpm),
             total_blood_volume_ml=np.full(size, RESTING_LOADING.total_blood_volume_ml),
-            systemic_resistance=np.full(
-                size, RESTING_LOADING.systemic_resistance_mmhg_s_per_ml
-            ),
+            systemic_resistance=np.full(size, RESTING_LOADING.systemic_resistance_mmhg_s_per_ml),
             dose_mg_per_day=0.0,
         )
         return float(summary.edv_ml[0])
@@ -173,8 +180,6 @@ def test_steady_state_solve_meets_its_speed_target() -> None:
 
 def test_trace_is_only_produced_when_asked() -> None:
     assert simulate(HEALTHY_GEOMETRY, HEALTHY_MATERIAL, RESTING_LOADING, 0.0).trace is None
-    traced = simulate(
-        HEALTHY_GEOMETRY, HEALTHY_MATERIAL, RESTING_LOADING, 0.0, record_trace=True
-    )
+    traced = simulate(HEALTHY_GEOMETRY, HEALTHY_MATERIAL, RESTING_LOADING, 0.0, record_trace=True)
     assert traced.trace is not None
     assert len(traced.trace.time_s) == ModelConstants().steps_per_beat

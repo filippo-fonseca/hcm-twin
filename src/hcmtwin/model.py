@@ -20,7 +20,8 @@ from typing import NamedTuple
 
 import numpy as np
 
-from . import chamber, circulation, defaults as d, drug, obstruction, sarcomere
+from . import chamber, circulation, drug, obstruction, sarcomere
+from . import defaults as d
 from .backend import ARRAY, SCALAR, Backend, Numeric
 from .calcium import beat_period_s, calcium_um
 from .parameters import HiddenMaterial, Loading, MeasuredGeometry, ModelConstants
@@ -134,9 +135,7 @@ def _evaluate(
         xp,
     )
     p_lv = chamber.cavity_pressure_mmhg(sigma_f, cavity_ml, p.wall_volume_ml)
-    p_ven = circulation.venous_pressure_mmhg(
-        p.total_volume_ml, cavity_ml, p_art, p.c_art, p.c_ven
-    )
+    p_ven = circulation.venous_pressure_mmhg(p.total_volume_ml, cavity_ml, p_art, p.c_art, p.c_ven)
 
     if p.obstruction_enabled:
         area = obstruction.lvot_area_cm2(
@@ -200,7 +199,7 @@ def _evaluate(
     return derivs, diag
 
 
-class _BeatSummary(NamedTuple):
+class BeatSummary(NamedTuple):
     """Reductions taken over a single beat.
 
     End-diastolic quantities are read at the *final* instant of the beat rather than at
@@ -277,7 +276,7 @@ class BeatResult:
     assert that no hidden quantity leaks into a predictor.
     """
 
-    summary: _BeatSummary
+    summary: BeatSummary
     converged: bool
     beats_used: int
     phi_effective: float
@@ -301,7 +300,7 @@ def _make_params(
     phi_eff = drug.effective_phi(
         hidden.phi_baseline, concentration, constants.drug_e_max, constants.drug_ec50_ng_per_ml
     )
-    rates = sarcomere.rates_from_phi(phi_eff, constants.k_park_tot_per_s)
+    rates = sarcomere.rates_from_phi(float(phi_eff), constants.k_park_tot_per_s)
     params = _Params(
         period_s=beat_period_s(loading.heart_rate_bpm),
         wall_volume_ml=measured.wall_volume_ml,
@@ -353,6 +352,9 @@ def _initial_state(
     identical, which is the test that makes it safe to tune the guess for speed.
     """
     n_rest = 0.0
+    parked: Numeric
+    available: Numeric
+    attached: Numeric
     if isinstance(p.phi_eff, np.ndarray):
         parked = np.empty_like(p.phi_eff)
         available = np.empty_like(p.phi_eff)
@@ -378,7 +380,7 @@ def _run_beat(
     xp: Backend,
     n_steps: int,
     record: bool,
-) -> tuple[tuple[Numeric, ...], _BeatSummary, BeatTrace | None]:
+) -> tuple[tuple[Numeric, ...], BeatSummary, BeatTrace | None]:
     """Advance one full cardiac cycle with fixed-step RK4 in normalised phase.
 
     Fixed step rather than adaptive: the system is only mildly stiff (the fastest time
@@ -505,7 +507,7 @@ def _run_beat(
     _, end_diag = _evaluate(1.0, parked, available, attached, distortion, cavity, p_art, p, xp)
     edp = end_diag.p_lv_mmhg
 
-    summary = _BeatSummary(
+    summary = BeatSummary(
         edv_ml=cavity,
         max_cavity_volume_ml=v_max,
         esv_ml=v_min,
@@ -583,8 +585,8 @@ def _iterate_to_steady_state(
     xp: Backend,
     constants: ModelConstants,
     record: bool,
-) -> tuple[_BeatSummary, BeatTrace | None, bool, int]:
-    state = _initial_state(p, xp)
+) -> tuple[BeatSummary, BeatTrace | None, bool, int]:
+    state: tuple[Numeric, ...] = _initial_state(p, xp)
     prev_edv: Numeric | None = None
     prev_map: Numeric | None = None
     converged = False
@@ -604,9 +606,7 @@ def _iterate_to_steady_state(
         prev_edv = summary.edv_ml
         prev_map = summary.mean_arterial_mmhg
 
-    final_state, summary, trace = _run_beat(
-        state, p, xp, constants.steps_per_beat, record=record
-    )
+    final_state, summary, trace = _run_beat(state, p, xp, constants.steps_per_beat, record=record)
     del final_state
     return summary, trace, converged, beats_used
 
@@ -641,9 +641,7 @@ def simulate(
         A :class:`BeatResult` for the beat *after* the steady-state test passed.
     """
     constants = constants or ModelConstants()
-    p, phi_eff, concentration = _make_params(
-        measured, hidden, loading, dose_mg_per_day, constants
-    )
+    p, phi_eff, concentration = _make_params(measured, hidden, loading, dose_mg_per_day, constants)
     summary, trace, converged, beats = _iterate_to_steady_state(p, SCALAR, constants, record_trace)
     return BeatResult(
         summary=summary,
@@ -671,7 +669,7 @@ def simulate_cohort(
     systemic_resistance: np.ndarray,
     dose_mg_per_day: np.ndarray | float = 0.0,
     constants: ModelConstants | None = None,
-) -> tuple[_BeatSummary, np.ndarray, np.ndarray, bool, int]:
+) -> tuple[BeatSummary, np.ndarray, np.ndarray, bool, int]:
     """Solve an entire cohort in lockstep. Same physics, NumPy instead of floats.
 
     Every argument is an array of the same length ``N``, one entry per virtual patient.

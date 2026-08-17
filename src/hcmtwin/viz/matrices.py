@@ -76,7 +76,10 @@ def plot_sensitivity_matrix(
     figure, ax = plt.subplots(figsize=(0.62 * n_cols + 4.0, 0.30 * n_rows + 2.2))
 
     image = ax.imshow(
-        values, cmap=style.sequential_cmap(), vmin=0.0, vmax=max(1.0, float(np.nanmax(values))),
+        values,
+        cmap=style.sequential_cmap(),
+        vmin=0.0,
+        vmax=max(1.0, float(np.nanmax(values))),
         aspect="auto",
     )
     ax.set_xticks(range(n_cols), [_label(c) for c in matrix.columns], rotation=38, ha="right")
@@ -95,15 +98,25 @@ def plot_sensitivity_matrix(
             if not np.isfinite(value) or value < 0.02:
                 continue
             ax.text(
-                j, i, f"{value:.2f}".lstrip("0"),
-                ha="center", va="center", fontsize=6.8,
+                j,
+                i,
+                f"{value:.2f}".lstrip("0"),
+                ha="center",
+                va="center",
+                fontsize=6.8,
                 color=style.SURFACE if value > threshold else style.TEXT_SECONDARY,
             )
 
     ax.set_title(title)
     ax.text(
-        0.0, 1.015, subtitle, transform=ax.transAxes, ha="left", va="bottom",
-        fontsize=8.5, color=style.TEXT_SECONDARY,
+        0.0,
+        1.015,
+        subtitle,
+        transform=ax.transAxes,
+        ha="left",
+        va="bottom",
+        fontsize=8.5,
+        color=style.TEXT_SECONDARY,
     )
     bar = figure.colorbar(image, ax=ax, fraction=0.022, pad=0.015)
     bar.outline.set_visible(False)
@@ -158,25 +171,37 @@ def plot_confounding_map(
                 continue
             confounded = abs(value) > threshold
             ax.text(
-                j, i, f"{value:+.2f}",
-                ha="center", va="center", fontsize=7.5,
+                j,
+                i,
+                f"{value:+.2f}",
+                ha="center",
+                va="center",
+                fontsize=7.5,
                 fontweight="bold" if confounded else "normal",
                 color=style.SURFACE if abs(value) > 0.55 else style.TEXT_PRIMARY,
             )
             if confounded:
                 ax.add_patch(
                     plt.Rectangle(
-                        (j - 0.5, i - 0.5), 1, 1, fill=False,
-                        edgecolor=style.TEXT_PRIMARY, linewidth=1.4,
+                        (j - 0.5, i - 0.5),
+                        1,
+                        1,
+                        fill=False,
+                        edgecolor=style.TEXT_PRIMARY,
+                        linewidth=1.4,
                     )
                 )
 
     ax.set_title(f"Posterior correlation between hidden parameters ({noise_level} noise)")
     ax.text(
-        0.0, 1.015,
+        0.0,
+        1.015,
         f"Outlined cells exceed |r| = {threshold:.2f} and are called confounded",
-        transform=ax.transAxes, ha="left", va="bottom",
-        fontsize=8.5, color=style.TEXT_SECONDARY,
+        transform=ax.transAxes,
+        ha="left",
+        va="bottom",
+        fontsize=8.5,
+        color=style.TEXT_SECONDARY,
     )
     bar = figure.colorbar(image, ax=ax, fraction=0.03, pad=0.02)
     bar.outline.set_visible(False)
@@ -203,9 +228,7 @@ def plot_recovery(
 
     style.apply()
     levels = list(dict.fromkeys(recovery_summary["noise_level"]))
-    order = (
-        recovery_summary.groupby("parameter")["median_ci90_width"].max().sort_values().index
-    )
+    order = recovery_summary.groupby("parameter")["median_ci90_width"].max().sort_values().index
     figure, ax = plt.subplots(figsize=(6.6, 0.52 * len(order) + 1.8))
 
     bar_height = 0.34
@@ -220,15 +243,25 @@ def plot_recovery(
             offset = (level_index - (len(levels) - 1) / 2) * (bar_height + gap)
             style.rounded_barh(ax, row_index + offset, width, bar_height, colour)
             ax.text(
-                width + 0.04, row_index + offset, f"{width:.2f}",
-                va="center", ha="left", fontsize=7.5, color=style.TEXT_SECONDARY,
+                width + 0.04,
+                row_index + offset,
+                f"{width:.2f}",
+                va="center",
+                ha="left",
+                fontsize=7.5,
+                color=style.TEXT_SECONDARY,
             )
         ax.plot([], [], color=colour, linewidth=6, label=f"{level} noise")
 
     ax.axvline(0.60, color=style.TEXT_MUTED, linewidth=1.0, linestyle=(0, (4, 3)))
     ax.text(
-        0.60, len(order) - 0.35, " recoverable", fontsize=7.5, color=style.TEXT_SECONDARY,
-        ha="left", va="center",
+        0.60,
+        len(order) - 0.35,
+        " recoverable",
+        fontsize=7.5,
+        color=style.TEXT_SECONDARY,
+        ha="left",
+        va="center",
     )
     ax.set_yticks(range(len(order)), [_label(p) for p in order])
     ax.set_xlabel("Width of the 90% credible interval, relative to the true value")
@@ -275,27 +308,43 @@ def plot_tiebreaker(
     labels = [f"{row['pair']}\n{_label(row['maneuver'])}" for _, row in grouped.iterrows()]
 
     figure, axes = plt.subplots(
-        1, 2, figsize=(11.0, 0.46 * len(grouped) + 2.2),
+        1,
+        2,
+        figsize=(11.0, 0.46 * len(grouped) + 2.2),
         gridspec_kw={"width_ratios": [1.25, 1.0]},
     )
 
     bar_height = 0.34
     for row_index, (_, row) in enumerate(grouped.iterrows()):
         style.rounded_barh(
-            axes[0], row_index + (bar_height + 0.04) / 2, float(row["before"]),
-            bar_height, style.SERIES[0],
+            axes[0],
+            row_index + (bar_height + 0.04) / 2,
+            float(row["before"]),
+            bar_height,
+            style.SERIES[0],
         )
         style.rounded_barh(
-            axes[0], row_index - (bar_height + 0.04) / 2, float(row["after"]),
-            bar_height, style.SERIES[1],
+            axes[0],
+            row_index - (bar_height + 0.04) / 2,
+            float(row["after"]),
+            bar_height,
+            style.SERIES[1],
         )
         axes[0].text(
-            float(row["before"]) + 0.015, row_index + (bar_height + 0.04) / 2,
-            f"{row['before']:.2f}", va="center", fontsize=7.2, color=style.TEXT_SECONDARY,
+            float(row["before"]) + 0.015,
+            row_index + (bar_height + 0.04) / 2,
+            f"{row['before']:.2f}",
+            va="center",
+            fontsize=7.2,
+            color=style.TEXT_SECONDARY,
         )
         axes[0].text(
-            float(row["after"]) + 0.015, row_index - (bar_height + 0.04) / 2,
-            f"{row['after']:.2f}", va="center", fontsize=7.2, color=style.TEXT_SECONDARY,
+            float(row["after"]) + 0.015,
+            row_index - (bar_height + 0.04) / 2,
+            f"{row['after']:.2f}",
+            va="center",
+            fontsize=7.2,
+            color=style.TEXT_SECONDARY,
         )
     axes[0].plot([], [], color=style.SERIES[0], linewidth=6, label="baseline alone")
     axes[0].plot([], [], color=style.SERIES[1], linewidth=6, label="baseline + maneuver")
@@ -312,13 +361,22 @@ def plot_tiebreaker(
         colour = style.STATUS_GOOD if snr >= 1.0 else style.TEXT_MUTED
         style.rounded_barh(axes[1], row_index, snr, 0.5, colour)
         axes[1].text(
-            snr + 0.05, row_index, f"{snr:.2f}", va="center", fontsize=7.2,
+            snr + 0.05,
+            row_index,
+            f"{snr:.2f}",
+            va="center",
+            fontsize=7.2,
             color=style.TEXT_SECONDARY,
         )
     axes[1].axvline(1.0, color=style.TEXT_PRIMARY, linewidth=1.1, linestyle=(0, (4, 3)))
     axes[1].text(
-        1.0, len(grouped) - 0.35, " one measurement error", fontsize=7.5,
-        color=style.TEXT_SECONDARY, ha="left", va="center",
+        1.0,
+        len(grouped) - 0.35,
+        " one measurement error",
+        fontsize=7.5,
+        color=style.TEXT_SECONDARY,
+        ha="left",
+        va="center",
     )
     axes[1].set_yticks(range(len(grouped)), [""] * len(grouped))
     axes[1].set_xlabel("Discriminating signal, in units of measurement error")
@@ -354,12 +412,22 @@ def plot_over_responder_separation(
     crash = eligible[eligible["over_responder"]]
 
     axes[0].scatter(
-        safe["ejection_fraction"], safe["ef_drop_at_mid_dose"], s=13,
-        color=style.SERIES[0], alpha=0.55, linewidths=0, label="tolerated",
+        safe["ejection_fraction"],
+        safe["ef_drop_at_mid_dose"],
+        s=13,
+        color=style.SERIES[0],
+        alpha=0.55,
+        linewidths=0,
+        label="tolerated",
     )
     axes[0].scatter(
-        crash["ejection_fraction"], crash["ef_drop_at_mid_dose"], s=26,
-        color=style.SERIES[1], alpha=0.9, linewidths=0.8, edgecolors=style.SURFACE,
+        crash["ejection_fraction"],
+        crash["ef_drop_at_mid_dose"],
+        s=26,
+        color=style.SERIES[1],
+        alpha=0.9,
+        linewidths=0.8,
+        edgecolors=style.SURFACE,
         label="crossed the floor",
     )
     axes[0].set_xlabel("Baseline ejection fraction")
@@ -378,9 +446,14 @@ def plot_over_responder_separation(
     groups = [(safe, "tolerated", style.SERIES[0]), (crash, "crossed the floor", style.SERIES[1])]
     present = [(g, label, colour) for g, label, colour in groups if len(g) > 0]
     axes[1].hist(
-        [g["ejection_fraction"] for g, _, _ in present], bins=bins, density=True,
-        color=[c for _, _, c in present], label=[label for _, label, _ in present],
-        histtype="stepfilled", alpha=0.72, linewidth=0,
+        [g["ejection_fraction"] for g, _, _ in present],
+        bins=bins,
+        density=True,
+        color=[c for _, _, c in present],
+        label=[label for _, label, _ in present],
+        histtype="stepfilled",
+        alpha=0.72,
+        linewidth=0,
     )
     axes[1].set_xlabel("Baseline ejection fraction")
     axes[1].set_ylabel("Density")
@@ -393,8 +466,13 @@ def plot_over_responder_separation(
     plt.close(figure)
 
     columns = [
-        "patient_id", "ejection_fraction", "ef_drop_at_mid_dose", "over_responder",
-        "wall_thickness_cm", "peak_lvot_gradient_mmhg", "e_over_e_prime",
+        "patient_id",
+        "ejection_fraction",
+        "ef_drop_at_mid_dose",
+        "over_responder",
+        "wall_thickness_cm",
+        "peak_lvot_gradient_mmhg",
+        "e_over_e_prime",
     ]
     data = eligible[columns]
     data.to_csv(output.with_suffix(".csv"), index=False)
@@ -423,15 +501,14 @@ def plot_observable_noise_context(output: Path) -> pd.DataFrame:
 
     figure, ax = plt.subplots(figsize=(6.8, 0.42 * len(frame) + 1.8))
     for row_index, (_, row) in enumerate(frame.iterrows()):
-        style.rounded_barh(
-            ax, row_index + 0.19, float(row["realistic"]), 0.34, style.SERIES[0]
-        )
-        style.rounded_barh(
-            ax, row_index - 0.19, float(row["optimistic"]), 0.34, style.SERIES[1]
-        )
+        style.rounded_barh(ax, row_index + 0.19, float(row["realistic"]), 0.34, style.SERIES[0])
+        style.rounded_barh(ax, row_index - 0.19, float(row["optimistic"]), 0.34, style.SERIES[1])
         ax.text(
-            float(row["realistic"]) + 0.006, row_index + 0.19,
-            f"{100 * row['realistic']:.0f}%", va="center", fontsize=7.2,
+            float(row["realistic"]) + 0.006,
+            row_index + 0.19,
+            f"{100 * row['realistic']:.0f}%",
+            va="center",
+            fontsize=7.2,
             color=style.TEXT_SECONDARY,
         )
     ax.plot([], [], color=style.SERIES[0], linewidth=6, label="realistic (routine 2D echo)")

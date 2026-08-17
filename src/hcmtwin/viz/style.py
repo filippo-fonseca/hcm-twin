@@ -23,9 +23,19 @@ SERIES_DARK: tuple[str, ...] = ("#3987e5", "#d95926", "#199e70")
 
 # --- Sequential: one hue, light to dark ----------------------------------------------
 SEQUENTIAL: tuple[str, ...] = (
-    "#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec",
-    "#5598e7", "#3987e5", "#2a78d6", "#256abf", "#1c5cab",
-    "#184f95", "#104281", "#0d366b",
+    "#cde2fb",
+    "#b7d3f6",
+    "#9ec5f4",
+    "#86b6ef",
+    "#6da7ec",
+    "#5598e7",
+    "#3987e5",
+    "#2a78d6",
+    "#256abf",
+    "#1c5cab",
+    "#184f95",
+    "#104281",
+    "#0d366b",
 )
 
 # --- Diverging: two poles, neutral gray midpoint --------------------------------------

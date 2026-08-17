@@ -81,8 +81,14 @@ def plot_loops(
     ax.set_title(title)
     if subtitle:
         ax.text(
-            0.0, 1.02, subtitle, transform=ax.transAxes, ha="left", va="bottom",
-            fontsize=8.5, color=style.TEXT_SECONDARY,
+            0.0,
+            1.02,
+            subtitle,
+            transform=ax.transAxes,
+            ha="left",
+            va="bottom",
+            fontsize=8.5,
+            color=style.TEXT_SECONDARY,
         )
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
@@ -118,8 +124,13 @@ def plot_dose_response(
     axes[0].plot(doses, ejection_fraction, color=style.SERIES[0], marker="o", markersize=5)
     axes[0].axhline(ef_threshold, color=style.STATUS_CRITICAL, linewidth=1.2, linestyle=(0, (4, 3)))
     axes[0].text(
-        doses[-1], ef_threshold, "  interruption threshold", va="center", ha="left",
-        fontsize=7.5, color=style.STATUS_CRITICAL,
+        doses[-1],
+        ef_threshold,
+        "  interruption threshold",
+        va="center",
+        ha="left",
+        fontsize=7.5,
+        color=style.STATUS_CRITICAL,
     )
     axes[0].set_ylabel("Ejection fraction")
     axes[0].set_xlabel("Maintained dose (mg/day)")
@@ -129,8 +140,13 @@ def plot_dose_response(
     axes[1].plot(doses, gradient_mmhg, color=style.SERIES[1], marker="o", markersize=5)
     axes[1].axhline(30.0, color=style.TEXT_MUTED, linewidth=1.0, linestyle=(0, (4, 3)))
     axes[1].text(
-        doses[-1], 30.0, "  obstruction threshold", va="center", ha="left",
-        fontsize=7.5, color=style.TEXT_SECONDARY,
+        doses[-1],
+        30.0,
+        "  obstruction threshold",
+        va="center",
+        ha="left",
+        fontsize=7.5,
+        color=style.TEXT_SECONDARY,
     )
     axes[1].set_ylabel("Peak outflow gradient (mmHg)")
     axes[1].set_xlabel("Maintained dose (mg/day)")

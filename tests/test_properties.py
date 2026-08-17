@@ -158,6 +158,4 @@ def test_steady_state_is_independent_of_initial_conditions() -> None:
         0.0,
         constants=ModelConstants(max_beats=80),
     )
-    assert float(baseline.summary.edv_ml) == pytest.approx(
-        float(shifted.summary.edv_ml), rel=1e-4
-    )
+    assert float(baseline.summary.edv_ml) == pytest.approx(float(shifted.summary.edv_ml), rel=1e-4)

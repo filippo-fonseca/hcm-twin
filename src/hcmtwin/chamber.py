@@ -33,8 +33,8 @@ from .units import MMHG_PER_KPA
 
 def fiber_strain(
     cavity_volume_ml: Numeric,
-    wall_volume_ml: float,
-    ref_cavity_volume_ml: float,
+    wall_volume_ml: Numeric,
+    ref_cavity_volume_ml: Numeric,
     xp: Backend = SCALAR,
 ) -> Numeric:
     """Representative natural fiber strain, dimensionless.
@@ -51,8 +51,8 @@ def fiber_strain(
 
 def stretch_from_volume(
     cavity_volume_ml: Numeric,
-    wall_volume_ml: float,
-    ref_cavity_volume_ml: float,
+    wall_volume_ml: Numeric,
+    ref_cavity_volume_ml: Numeric,
     xp: Backend = SCALAR,
 ) -> Numeric:
     """Sarcomere stretch ``lam = exp(eps_f)``, dimensionless."""
@@ -62,7 +62,7 @@ def stretch_from_volume(
 def cavity_pressure_mmhg(
     fiber_stress_kpa: Numeric,
     cavity_volume_ml: Numeric,
-    wall_volume_ml: float,
+    wall_volume_ml: Numeric,
 ) -> Numeric:
     """Cavity pressure implied by a representative fiber stress, mmHg.
 
@@ -77,13 +77,11 @@ def cavity_pressure_mmhg(
 def fiber_stress_from_pressure_kpa(
     cavity_pressure_mmhg_value: Numeric,
     cavity_volume_ml: Numeric,
-    wall_volume_ml: float,
+    wall_volume_ml: Numeric,
 ) -> Numeric:
     """Inverse of :func:`cavity_pressure_mmhg`, kPa. Used by tests and by calibration."""
     return (
-        cavity_pressure_mmhg_value
-        * (1.0 + 3.0 * cavity_volume_ml / wall_volume_ml)
-        / MMHG_PER_KPA
+        cavity_pressure_mmhg_value * (1.0 + 3.0 * cavity_volume_ml / wall_volume_ml) / MMHG_PER_KPA
     )
 
 
@@ -105,7 +103,7 @@ def wall_thickness_cm(cavity_volume_ml, wall_volume_ml):  # type: ignore[no-unty
     """
     safe_cavity = np.maximum(cavity_volume_ml, 0.0)
     r_inner_cm = (3.0 * safe_cavity / (4.0 * math.pi)) ** (1.0 / 3.0)
-    r_outer_cm = (
-        3.0 * np.maximum(safe_cavity + wall_volume_ml, 0.0) / (4.0 * math.pi)
-    ) ** (1.0 / 3.0)
+    r_outer_cm = (3.0 * np.maximum(safe_cavity + wall_volume_ml, 0.0) / (4.0 * math.pi)) ** (
+        1.0 / 3.0
+    )
     return r_outer_cm - r_inner_cm
