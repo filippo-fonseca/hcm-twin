@@ -252,6 +252,39 @@ filling pressure, the raised E/e', or the energetic penalty.
   PDF, every deliverable present, and `validation_all_pass: true`. That is the definition
   of done, actually executed rather than asserted.
 
+## The central result, and where it is computed
+
+Added after the first full build, on the observation that the project's main finding was
+implicit rather than stated: you had to read the outcome-Sobol column out of
+`sensitivity_sobol.csv`, the visibility column out of `sensitivity_summary.csv`, and rank them
+against each other yourself.
+
+`analysis/sensitivity.visibility_versus_importance` now joins the two and ranks both;
+`inversion_statistics` reports the Spearman rank correlation between them. Written to
+`results/visibility_vs_importance.csv` and `..._stats.json`, rendered as `table_inversion.tex`,
+and carried into the paper as Section 5.2.
+
+The number is **rho = -0.90 (p = 0.037, n = 5)**, identical when restricted to routine
+non-invasive observables. The rankings are reversed except that the bottom two swap. An
+earlier verbal claim of a *perfect* reversal was wrong and was corrected before it reached the
+paper: `a_pas` and `b_pas` sit at visibility ranks 1 and 2 against importance ranks 4 and 5,
+so the reversal is one transposition short.
+
+By variance rather than rank: recoverable parameters carry 0.32 of the outcome total-order
+index, unrecoverable ones 0.63. Total-order indices overlap, so those do not partition the
+variance and will not sum to one. Do not present them as a partition.
+
+Caveat that must travel with the number: five parameters is a small sample, so the sign is the
+message and the decimal is not. The individual rows are the evidence.
+
+**Bug found by this work:** `report.required_macros` derives the macro list from `main.tex` by
+regex, so writing `\medskip` in the paper made the build fail with "Command \medskip already
+defined". Placeholders now emit `\providecommand` instead of `\newcommand`; real values still
+use `\newcommand` so a genuine collision in our own macros stays loud. The hand-maintained
+`_NOT_OURS` exclusion list is now an optimisation, not a correctness requirement.
+
+---
+
 ## How this was built (AI usage)
 
 Recorded here as well as in the README and the paper, so a future session inherits the same
