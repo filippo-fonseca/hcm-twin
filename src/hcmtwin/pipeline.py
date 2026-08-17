@@ -162,6 +162,16 @@ def run_sensitivity(config: Config, params: pd.DataFrame, labelled: pd.DataFrame
     summary = sens.summarise(output["sobol"])
     summary.to_csv(config.path("sensitivity_summary.csv"), index=False)
 
+    inversion = sens.visibility_versus_importance(output["sobol"], summary)
+    inversion.to_csv(config.path("visibility_vs_importance.csv"), index=False)
+    stats = sens.inversion_statistics(inversion)
+    config.path("visibility_vs_importance_stats.json").write_text(json.dumps(stats, indent=2))
+    logger.info(
+        "visibility vs importance: spearman rho = %+.2f over %d hidden parameters",
+        stats["spearman_any"],
+        int(stats["n_parameters"]),
+    )
+
     matrices.plot_sensitivity_matrix(output["matrix"], config.path("fig_sensitivity_matrix.png"))
     hidden_matrix = output["matrix"][list(idn.HIDDEN_ORDER)]
     matrices.plot_sensitivity_matrix(
@@ -172,6 +182,7 @@ def run_sensitivity(config: Config, params: pd.DataFrame, labelled: pd.DataFrame
     )
     _record(config, "sensitivity", started)
     output["summary"] = summary
+    output["inversion"] = inversion
     return output
 
 

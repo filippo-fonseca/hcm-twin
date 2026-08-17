@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from hcmtwin import RESTING_LOADING, HiddenMaterial, MeasuredGeometry
 from hcmtwin import defaults as d
 from hcmtwin.analysis import identifiability as idn
+from hcmtwin.analysis import sensitivity as sens
 from hcmtwin.analysis import tiebreaker as tb
 from hcmtwin.analysis.surrogate import Surrogate, latin_hypercube
 
@@ -264,3 +266,60 @@ def test_outcome_names_are_not_observables() -> None:
     from hcmtwin.observables import OBSERVABLE_NAMES
 
     assert not set(OUTCOME_NAMES) & set(OBSERVABLE_NAMES)
+
+
+# =====================================================================================
+# Visibility versus importance: the inversion table
+# =====================================================================================
+
+
+def _inversion_inputs() -> tuple[pd.DataFrame, pd.DataFrame]:
+    """A minimal Sobol/summary pair with a known, deliberately reversed ranking."""
+    sobol = pd.DataFrame(
+        {
+            "quantity": [sens.OUTCOME_FOR_RANKING] * 3,
+            "parameter": ["a", "b", "c"],
+            "group": ["hidden"] * 3,
+            "S1": [0.5, 0.2, 0.1],
+            "ST": [0.6, 0.3, 0.1],
+        }
+    )
+    summary = pd.DataFrame(
+        {
+            "parameter": ["a", "b", "c"],
+            "best_observable": ["x", "y", "z"],
+            "best_total_order": [0.01, 0.20, 0.90],
+            "best_routine_total_order": [0.01, 0.20, 0.90],
+        }
+    )
+    return sobol, summary
+
+
+def test_visibility_versus_importance_ranks_both_directions() -> None:
+    table = sens.visibility_versus_importance(*_inversion_inputs())
+    assert list(table["parameter"]) == ["a", "b", "c"]  # sorted by outcome importance
+    assert list(table["rank_drives"]) == [1, 2, 3]
+    assert list(table["rank_visible"]) == [3, 2, 1]
+
+
+def test_inversion_statistics_detects_a_perfect_reversal() -> None:
+    stats = sens.inversion_statistics(sens.visibility_versus_importance(*_inversion_inputs()))
+    assert stats["spearman_any"] == pytest.approx(-1.0)
+    assert stats["spearman_routine"] == pytest.approx(-1.0)
+    assert stats["n_parameters"] == 3
+
+
+def test_inversion_statistics_detects_agreement() -> None:
+    """Sign is the message, so a model where visibility tracked importance must flip it."""
+    sobol, summary = _inversion_inputs()
+    summary["best_total_order"] = [0.90, 0.20, 0.01]
+    summary["best_routine_total_order"] = [0.90, 0.20, 0.01]
+    stats = sens.inversion_statistics(sens.visibility_versus_importance(sobol, summary))
+    assert stats["spearman_any"] == pytest.approx(1.0)
+
+
+def test_visibility_versus_importance_requires_the_outcome() -> None:
+    sobol, summary = _inversion_inputs()
+    sobol["quantity"] = "not_the_outcome"
+    with pytest.raises(ValueError, match="no hidden-parameter Sobol rows"):
+        sens.visibility_versus_importance(sobol, summary)

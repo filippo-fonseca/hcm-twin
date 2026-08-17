@@ -182,6 +182,88 @@ def run(
     return {"sobol": sobol, "spearman": spearman, "matrix": matrix}
 
 
+OUTCOME_FOR_RANKING: str = "ef_drop_at_mid_dose"
+"""The outcome whose drivers are ranked against measurement visibility.
+
+Ejection-fraction drop at the mid dose, because that is the quantity the safety floor is
+written on. ``ef_slope_per_mg`` gives the identical ranking (it is the same quantity
+divided by a constant dose)."""
+
+
+def visibility_versus_importance(sobol: pd.DataFrame, summary: pd.DataFrame) -> pd.DataFrame:
+    """Join "how much does this parameter drive the outcome" to "can we see it".
+
+    The central table of the project. Column ``drives_outcome_st`` is the total-order
+    Sobol index of each hidden parameter on :data:`OUTCOME_FOR_RANKING`; column
+    ``visible_st`` is the largest total-order index that parameter achieves on *any*
+    observable, i.e. the best case for measuring it. Ranking by the two columns and
+    comparing gives the headline: the ordering is close to reversed.
+
+    Args:
+        sobol: Long-form Sobol table from :func:`sobol_indices`.
+        summary: Output of :func:`summarise`.
+
+    Returns:
+        One row per hidden parameter, sorted by ``drives_outcome_st`` descending, with
+        both ranks and both visibility columns (any observable, and routine-only).
+    """
+    drives = sobol[(sobol["quantity"] == OUTCOME_FOR_RANKING) & (sobol["group"] == "hidden")]
+    if drives.empty:
+        raise ValueError(f"no hidden-parameter Sobol rows for {OUTCOME_FOR_RANKING!r}")
+    table = (
+        drives[["parameter", "ST"]]
+        .rename(columns={"ST": "drives_outcome_st"})
+        .merge(
+            summary[
+                [
+                    "parameter",
+                    "best_observable",
+                    "best_total_order",
+                    "best_routine_total_order",
+                ]
+            ],
+            on="parameter",
+            how="left",
+        )
+        .rename(
+            columns={
+                "best_total_order": "visible_st",
+                "best_routine_total_order": "visible_routine_st",
+            }
+        )
+    )
+    table["rank_drives"] = table["drives_outcome_st"].rank(ascending=False).astype(int)
+    table["rank_visible"] = table["visible_st"].rank(ascending=False).astype(int)
+    return table.sort_values("drives_outcome_st", ascending=False).reset_index(drop=True)
+
+
+def inversion_statistics(table: pd.DataFrame) -> dict[str, float]:
+    """Quantify the reversal in :func:`visibility_versus_importance`.
+
+    Reports Spearman rank correlation between driving the outcome and being visible. With
+    only five hidden parameters this is a descriptive statistic on a very small sample, so
+    the sign and rough magnitude are the message and the exact value is not.
+
+    Returns:
+        ``spearman_any``, ``spearman_routine``, ``p_any``, and the total-order index mass
+        sitting on parameters that a realistic study does and does not recover. Total-order
+        indices overlap, so those two sums do not partition the variance and will not add
+        to one.
+    """
+    from scipy import stats
+
+    rho_any, p_any = stats.spearmanr(table["drives_outcome_st"], table["visible_st"])
+    rho_routine, _ = stats.spearmanr(
+        table["drives_outcome_st"], table["visible_routine_st"].fillna(0.0)
+    )
+    return {
+        "spearman_any": float(rho_any),
+        "p_any": float(p_any),
+        "spearman_routine": float(rho_routine),
+        "n_parameters": float(len(table)),
+    }
+
+
 def summarise(sobol: pd.DataFrame) -> pd.DataFrame:
     """Per hidden parameter: which observable sees it best, and how well.
 
