@@ -134,7 +134,14 @@ class _Macros:
             "% Every quantitative claim in main.tex resolves through one of these.",
         ]
         for name, value in sorted(self._items.items()):
-            lines.append(f"\\newcommand{{\\{name}}}{{{value}}}")
+            # \providecommand, not \newcommand, for the placeholders: the required-macro
+            # set is derived from the document by regex, so it can pick up a control
+            # sequence LaTeX already owns (\medskip did exactly this). Redefining one is a
+            # fatal "already defined" error; skipping it silently is correct, because a
+            # built-in needs no value from us. Real values below still use \newcommand, so
+            # a genuine name collision in our own macros stays loud.
+            command = "providecommand" if value == MISSING else "newcommand"
+            lines.append(f"\\{command}{{\\{name}}}{{{value}}}")
         return "\n".join(lines) + "\n"
 
     def __len__(self) -> int:
@@ -237,6 +244,28 @@ def build_macros(results_dir: Path, tex_source: Path | None = None) -> str:
                 "invisibleParameterNames",
                 ", ".join(PRETTY.get(i, i) for i in invisible.index) or "none",
             )
+
+    # --- visibility versus importance (the inversion) --------------------------------
+    inversion = _read(results_dir / "visibility_vs_importance.csv")
+    if inversion is not None:
+        ranked = inversion.sort_values("drives_outcome_st", ascending=False)
+        m.set("inversionTopDriver", PRETTY.get(ranked.iloc[0]["parameter"], ""))
+        m.set("inversionTopVisible", PRETTY.get(
+            inversion.sort_values("visible_st", ascending=False).iloc[0]["parameter"], ""))
+        stats_path = results_dir / "visibility_vs_importance_stats.json"
+        if stats_path.exists():
+            stats = json.loads(stats_path.read_text())
+            m.set("inversionSpearman", stats["spearman_any"], 2)
+            m.set("inversionSpearmanP", stats["p_any"], 3)
+            m.set("inversionN", int(stats["n_parameters"]))
+
+        recovery_names = _read(results_dir / "recovery_summary.csv")
+        if recovery_names is not None and "recoverable" in recovery_names.columns:
+            realistic = recovery_names[recovery_names["noise_level"] == "realistic"]
+            good = set(realistic[realistic["recoverable"]]["parameter"])
+            mass = inversion.set_index("parameter")["drives_outcome_st"]
+            m.set("driverMassRecoverable", float(mass[mass.index.isin(good)].sum()), 2)
+            m.set("driverMassLost", float(mass[~mass.index.isin(good)].sum()), 2)
 
     # --- identifiability ---------------------------------------------------------------
     fisher = _read(results_dir / "fisher_table.csv")
@@ -452,6 +481,30 @@ def write_result_tables(results_dir: Path, output_dir: Path) -> list[Path]:
         path = output_dir / "table_recovery.tex"
         path.write_text(
             frame.to_latex(index=False, escape=True, column_format="llrrc", float_format="%.2f"),
+            encoding="utf-8",
+        )
+        written.append(path)
+
+    inversion = _read(results_dir / "visibility_vs_importance.csv")
+    recovery_flags = _read(results_dir / "recovery_summary.csv")
+    if inversion is not None and len(inversion):
+        good: set[str] = set()
+        if recovery_flags is not None and "recoverable" in recovery_flags.columns:
+            realistic = recovery_flags[recovery_flags["noise_level"] == "realistic"]
+            good = set(realistic[realistic["recoverable"]]["parameter"])
+        frame = pd.DataFrame(
+            {
+                "Hidden parameter": [PRETTY.get(x, x) for x in inversion["parameter"]],
+                "Drives outcome": inversion["drives_outcome_st"],
+                "Rank": inversion["rank_drives"],
+                "Best visibility": inversion["visible_st"],
+                "Rank ": inversion["rank_visible"],
+                "Recovered?": ["yes" if x in good else "no" for x in inversion["parameter"]],
+            }
+        )
+        path = output_dir / "table_inversion.tex"
+        path.write_text(
+            frame.to_latex(index=False, escape=True, column_format="lrcrcc", float_format="%.3f"),
             encoding="utf-8",
         )
         written.append(path)
