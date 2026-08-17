@@ -8,7 +8,7 @@
 [![validation gates](https://img.shields.io/badge/validation%20gates-35%2F35-1baf7a)](results/validation_table.md)
 [![python](https://img.shields.io/badge/python-3.11%2B-2a78d6)](pyproject.toml)
 [![license](https://img.shields.io/badge/license-MIT-2a78d6)](LICENSE)
-[![reproducible](https://img.shields.io/badge/make%20all-16%20min-eb6834)](Dockerfile)
+[![reproducible](https://img.shields.io/badge/make%20all-~20%20min-eb6834)](Dockerfile)
 
 [The question](#the-question) · [What you get](#what-you-get) · [Quickstart](#quickstart) · [Main finding](#the-main-finding) · [Where to look next](#where-to-look-next) · [Honesty](#honesty-constraints) · [AI usage](#ai-usage)
 
@@ -93,7 +93,7 @@ constants** traces to a cited row, labelled `measured`, `calibrated` or `assumed
 ```bash
 make setup      # venv + pinned dependencies (requirements.lock)
 make test       # full suite: 146 tests including every validation gate
-make all        # everything: gates, cohort, figures, CSVs, explorer, PDF  (~16 min)
+make all        # everything: gates, cohort, figures, CSVs, explorer, PDF  (~20 min)
 ```
 
 Or with no local Python at all:
