@@ -9,7 +9,7 @@
 
 \documentclass[11pt,a4paper]{article}
 
-\usepackage[margin=2.4cm]{geometry}
+\usepackage[margin=2.15cm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage{lmodern}
 \usepackage{microtype}
@@ -26,7 +26,7 @@
 \definecolor{accent}{HTML}{2A78D6}
 \definecolor{warn}{HTML}{E34948}
 \captionsetup{font=small,labelfont={bf,color=accent}}
-\setlist{itemsep=2pt,topsep=4pt}
+\setlist{itemsep=1pt,topsep=3pt}
 \graphicspath{{../results/}}
 
 \newcommand{\claim}[1]{\textcolor{accent}{\textbf{#1}}}
@@ -122,25 +122,19 @@ treatment move one quantity in opposite directions. Thin-filament activation is 
 function of calcium with a length-dependent $\text{Ca}_{50}$, and ATP is charged one per
 attachment event, so parked heads cost nothing.
 
-The specification this work followed prescribed $\sigma_a = T_\text{ref} A$. Three additions
-were needed, each because the model visibly failed without it, and each documented with its
-failure:
-
-\begin{itemize}
-  \item \textbf{Active force--length (filament overlap).} Cavity pressure is
-        $\sigma_f/(1+3V/V_w)$, so at fixed fiber stress a \emph{smaller} cavity makes
-        \emph{more} pressure. With no length dependence the chamber's pressure-generating
-        capacity rises monotonically as it empties (141\,mmHg at 100\,mL, 224 at 42,
-        314 at 13): a \emph{negative} end-systolic elastance. Ejection then never meets a
-        force balance.
-  \item \textbf{Cross-bridge distortion,} giving a force--velocity relation. Without it
-        shortening speed is unbounded and the first coupled run ejected past zero volume.
-  \item \textbf{Force-dependent recruitment from the parked state,} the published mechanism
-        for length-dependent activation. Calcium-sensitivity length dependence alone gave a
-        stroke volume that was flat then falling as preload rose. It is also what makes
-        contractile reserve mechanistically real: a depleted parked pool cannot be recruited
-        when load rises.
-\end{itemize}
+The specification this work followed prescribed $\sigma_a = T_\text{ref} A$, and three
+additions were needed, each because the model visibly failed without it. An \textbf{active
+force--length} term, because cavity pressure is $\sigma_f/(1+3V/V_w)$ and so at fixed fiber
+stress a \emph{smaller} cavity makes \emph{more} pressure: with no length dependence the
+chamber's pressure-generating capacity rises as it empties (141\,mmHg at 100\,mL, 224 at 42,
+314 at 13), a \emph{negative} end-systolic elastance, and ejection never meets a force
+balance. \textbf{Cross-bridge distortion}, giving a force--velocity relation, because without
+it shortening speed is unbounded and the first coupled run ejected past zero volume. And
+\textbf{force-dependent recruitment from the parked state}, the published mechanism for
+length-dependent activation, because calcium-sensitivity length dependence alone gave a
+stroke volume that was flat then falling as preload rose; it is also what makes contractile
+reserve mechanistically real, since a depleted parked pool cannot be recruited when load
+rises.
 
 \paragraph{Layer 2: chamber.} The one-fiber relation of Arts and colleagues:
 $\varepsilon_f = \tfrac13\log\!\big((V_\text{lv}+V_w/3)/(V_\text{lv,ref}+V_w/3)\big)$ and
@@ -177,7 +171,7 @@ the passive relation is monotone and convex at fixed volume.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.62\linewidth]{fig_pv_loops.png}
+  \includegraphics[width=0.44\linewidth]{fig_pv_loops.png}
   \caption{The phenotype is a consequence, not an input. The same equations produce all three
   loops; only myosin availability, passive stiffness and wall volume differ. Nothing in the
   model writes down an ejection fraction, and a test walks the package's syntax tree to prove
@@ -208,12 +202,10 @@ $-4.8$ points against a gradient falling from about 55 to about 20\,mmHg.
 which the provenance table documents constant by constant, so this is a prediction rather
 than a fit.
 
-\paragraph{Calibration honesty.} The healthy and HCM references were calibrated by grid
-search against resting haemodynamic \emph{ranges}, never against a trial outcome. Three
-ejection-realism targets (peak outflow velocity, ejection duration, peak aortic flow) were
-added after a first calibration passed every haemodynamic gate while ejecting the whole
-stroke volume in 154\,ms at twice physiological peak flow. A model can satisfy its checks and
-still be wrong.
+\paragraph{Calibration honesty.} References were calibrated against resting haemodynamic
+\emph{ranges}, never a trial outcome. Three ejection-realism targets were added after a first
+calibration passed every haemodynamic gate while ejecting the whole stroke volume in 154\,ms
+at twice physiological peak flow: a model can satisfy its checks and still be wrong.
 
 \section{Virtual population}
 
@@ -243,7 +235,7 @@ provenance table would then have had to mark it non-independent.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.86\linewidth]{fig_over_responders.png}
+  \includegraphics[width=0.60\linewidth]{fig_over_responders.png}
   \caption{The premise, drawn. Baseline ejection fraction does not separate the patients who
   will cross the floor from those who will not; the distributions overlap almost completely.
   This is the problem the rest of the paper is about.}
@@ -266,7 +258,7 @@ does not move any pre-treatment measurement at all.
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=0.82\linewidth]{fig_sensitivity_hidden.png}
+  \includegraphics[width=0.56\linewidth]{fig_sensitivity_hidden.png}
   \caption{Total-order Sobol indices of each observable and outcome against the five hidden
   parameters. The bottom rows are outcomes, not measurements. Note the clearance column:
   everything above the outcome rows is zero.}
@@ -291,22 +283,21 @@ all; no maneuver can amplify a signal that does not exist). \claim{Clearance is 
 kind. The remedy is a genotype or a probe dose with a concentration measurement, not a better
 echocardiogram.}
 
-\paragraph{Global.} For \nIdentifiabilityCases{} patients, the observables plus realistic
-noise were treated as data and the posterior over the five hidden parameters recovered by
-Markov chain Monte Carlo. Sampling ran against a per-patient polynomial emulator fitted on
-\nSurrogateDesign{} design points, whose held-out coefficient of determination is at worst
-\surrogateMinRsq{} and typically \surrogateMedianRsq. The emulator's error is added in
-quadrature to the measurement noise, so imprecision widens the posterior rather than
-corrupting it, and the synthetic data always come from the exact model so that emulator
-error acts as misspecification rather than cancelling out.
+\paragraph{Global.} For \nIdentifiabilityCases{} patients the observables plus realistic
+noise were treated as data and the posterior recovered by Markov chain Monte Carlo, against a
+per-patient polynomial emulator fitted on \nSurrogateDesign{} design points (held-out
+$R^2$ at worst \surrogateMinRsq, typically \surrogateMedianRsq). The emulator's error is added
+in quadrature to the measurement noise so imprecision widens the posterior rather than
+corrupting it, and the synthetic data always come from the exact model so emulator error acts
+as misspecification rather than cancelling out.
 
 \begin{figure}[t]
   \centering
-  \begin{subfigure}{0.49\linewidth}
+  \begin{subfigure}{0.41\linewidth}
     \includegraphics[width=\linewidth]{fig_confounding_map.png}
   \end{subfigure}
   \hfill
-  \begin{subfigure}{0.49\linewidth}
+  \begin{subfigure}{0.41\linewidth}
     \includegraphics[width=\linewidth]{fig_recovery.png}
   \end{subfigure}
   \caption{Left: posterior correlation between hidden parameters at realistic measurement
@@ -357,7 +348,7 @@ deliberately generous bar.}
 
 \begin{figure}[t]
   \centering
-  \includegraphics[width=\linewidth]{fig_tiebreaker.png}
+  \includegraphics[width=0.80\linewidth]{fig_tiebreaker.png}
   \caption{Does the maneuver break the confound (left), and is the resulting signal bigger
   than the error bar (right)? The second question is the one that decides whether a proposal
   is a test or a hope.}
@@ -365,15 +356,37 @@ deliberately generous bar.}
 \end{figure}
 
 The best case is \bestPair{} under \bestManeuver, where the width along the invisible
-direction falls from \bestRidgeBefore{} to \bestRidgeAfter{} (a \bestRidgeShrinkage\%
-reduction) and the discriminating signal is \bestSignal\,\bestSignalUnits{} in
-\bestSignalObservable, or \bestSignalToNoise{} measurement standard deviations (exceeds
-noise: \bestExceedsNoise). \nPairsSeparated{} of \nPairsTested{} examined pairs produce a
-signal above one measurement error, and \nPairsNarrowed{} show a meaningful narrowing of the
-invisible direction. The maneuver was interpretable in \bestManeuverUsable\% of the patients
-it was applied to; any remainder are ventricles too stiff to fill at the provoked heart
-rate, which is not a numerical failure but the maneuver being uninterpretable in exactly the
-patients it was proposed for.
+direction falls from \bestRidgeBefore{} to \bestRidgeAfter{}, a \bestRidgeShrinkage\%
+reduction. \nPairsSeparated{} of \nPairsTested{} examined pairs produce a discriminating
+signal above one measurement error, but only \nPairsNarrowed{} show a meaningful narrowing
+of the invisible direction. The maneuver was interpretable in \bestManeuverUsable\% of the
+patients it was applied to; any remainder are ventricles too stiff to fill at the provoked
+heart rate, which is not a numerical failure but the maneuver being uninterpretable in
+exactly the patients it was proposed for.
+
+\paragraph{The two columns disagree, and the disagreement is the result.} The exercise
+maneuver moves \bestSignalObservable{} by \bestSignalScaled\,\bestSignalScaledUnits{} between two
+patients a resting study cannot tell apart, which is \bestSignalToNoise{} measurement
+standard deviations and looks decisive. Yet the posterior barely narrows along the direction
+that signal was supposed to resolve. Three candidate explanations, two of which we can
+rule out.
+
+It is not the emulator: its held-out error is at most a quarter of the measurement error for
+any observable in any condition, so adding it in quadrature inflates the likelihood width by
+about 3\%. It is not sampling noise: the pattern is consistent across all fifty patients and
+all four maneuvers.
+
+\claim{It is nuisance compensation.} The signal is computed with the other three hidden
+parameters held at their true values, and a real inference is not granted that. A change in
+the maneuver's observables that is large when the rest of the tissue is known can be
+mimicked by adjusting the parameters that are not, and an inference estimating all five at
+once cannot separate the two explanations. So the honest reading is that these maneuvers
+\emph{do} move the measurements, and that the movement is not specific enough to the
+confounded combination to resolve it once everything else is also unknown.
+
+That distinction matters for anyone designing the study this analysis is meant to inform. A
+protocol justified by "the maneuver changes the measurement a lot" is justified by the wrong
+quantity.
 
 \section{Discussion}
 
@@ -390,12 +403,9 @@ titration rather than inferred from its consequences. That is a concrete and tes
 proposal, and it is consistent with the direction of current clinical interest in
 prospective genotyping.
 
-The tissue-level story is more mixed and is reported in Table~\ref{tab:recovery}. Some
-material parameters are recoverable from a routine study; the two passive stiffness
-parameters trade off against each other, which is unsurprising given that they are two arms
-of one exponential; and a maneuver helps in some cases by an amount that a real clinic could
-or could not measure, which is exactly the distinction the table is built to draw.
-
+The tissue-level story is more mixed (Table~\ref{tab:recovery}): some material parameters
+are recoverable from a routine study, and the two passive stiffness parameters trade off
+against each other, which is unsurprising given that they are two arms of one exponential.
 A caution about the direction of our errors is owed to the reader.
 \caution{Several modelling choices make the posterior tighter than reality.} The noise model
 treats observables as independent when their errors are correlated; it is Gaussian where real
@@ -410,7 +420,7 @@ asymmetry attached.
 Stated plainly, because several of them bound the conclusions rather than merely qualifying
 them.
 
-\begin{itemize}
+\begin{itemize}[nosep,leftmargin=1.1em]
   \item \textbf{Prescribed calcium, not simulated electrophysiology.} No ion channels, no
         rate-dependent calcium handling, no catecholamine effect. The tachycardia and
         exercise maneuvers therefore capture the shortening of filling time and nothing
@@ -418,43 +428,36 @@ them.
         whole of exercise. The calcium time constant was calibrated to systolic
         \emph{duration} rather than to the measured upstroke, because a single-time-constant
         waveform cannot match both.
-  \item \textbf{Zero-dimensional chamber.} Homogeneous wall loading, so no fiber disarray, no
-        regional fibrosis, no asymmetric hypertrophy, no systolic anterior motion as an
-        explicit mechanism. HCM hypertrophy is characteristically asymmetric and this model
-        has a uniformly thickened wall of the same total volume.
+  \item \textbf{Zero-dimensional chamber.} Homogeneous wall loading: no fiber disarray, no
+        regional fibrosis, no asymmetric hypertrophy (which is what HCM characteristically
+        has), and no systolic anterior motion as an explicit mechanism.
   \item \textbf{Steady-state pharmacokinetics only.} The model can say \emph{whether} a
         maintained dose takes a patient below the floor and not \emph{when}. The clinical
         protocol is fundamentally about timing, so this bounds what can be claimed.
-  \item \textbf{No growth or remodelling.} Wall volume is sampled, not grown. The model
-        describes a geometry-plus-material combination today and says nothing about how it
-        arose or where it is heading.
+  \item \textbf{No growth or remodelling.} Wall volume is sampled, not grown, so the model
+        says nothing about how a given geometry arose or where it is heading.
   \item \textbf{The drug slightly raises filling pressure in the model,} whereas trials report
         improved filling parameters on treatment. The model has no load-dependent improvement
         in relaxation. This is a real discrepancy and is reported rather than smoothed over.
   \item \textbf{A third of the model's constants are labelled \texttt{assumed}} in the
         provenance table (10 measured, 22 calibrated, 33 assumed). Absolute outputs should be
         read as illustrative; directional and relative outputs are the substantive ones.
-  \item \textbf{No mutation-specific claims.} The mapping from a named variant to a numerical
-        parameter is literature-derived and approximate. Every claim here is about regions of
-        parameter space, never about named patients.
-  \item \textbf{Nothing here is validated against a patient.} The comparisons to trial data
-        are comparisons of aggregate behaviour to published aggregates.
+  \item \textbf{No mutation-specific claims, and nothing validated against a patient.} The
+        mapping from a named variant to a numerical parameter is literature-derived and
+        approximate, so every claim here is about regions of parameter space; the comparisons
+        to trial data compare aggregate behaviour to published aggregates.
 \end{itemize}
 
 \section{Reproducibility}
 
 One command reproduces every figure, and every figure ships with the CSV behind it.
-\texttt{make all} inside the supplied container runs the test suite (including all
-\nGates{} validation gates and a provenance-coverage test that fails if any constant lacks a
-sourced row), generates the virtual population from a logged seed (\seed), and produces every
-table, figure and this document. Total wall-clock time for the run described here was
-\runtimeMinutes{} minutes. Every quantitative statement in this paper is a macro resolved from
-a results file at build time; none is typed.
-
-\vspace{4pt}
-\noindent\textbf{Data and code.} The research dossier in \texttt{docs/research/} records the
-source of every constant, every simplification made relative to it, and every place the
-literature failed to supply what the model needed. Those gaps are marked and described rather
-than filled with plausible values.
+\texttt{make all} inside the supplied container runs the test suite (all \nGates{} validation
+gates plus a provenance-coverage test that fails if any constant lacks a sourced row),
+generates the cohort from a logged seed (\seed), and produces every table, figure and this
+document in \runtimeMinutes{} minutes. Every quantitative statement here is a macro resolved
+from a results file at build time; none is typed. The research dossier in
+\texttt{docs/research/} records the source of every constant, every simplification made
+relative to it, and every place the literature failed to supply what the model needed; those
+gaps are marked and described rather than filled with plausible values.
 
 \end{document}

@@ -30,3 +30,6 @@ results/scratch/
 results/population_conditions.csv.gz
 # The run log is a transcript, not a result.
 results_run.log
+
+# Playwright MCP scratch output from browser checks.
+.playwright-mcp/

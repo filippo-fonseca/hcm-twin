@@ -55,6 +55,11 @@ def _label(name: str) -> str:
     return PRETTY.get(name, name.replace("_", " "))
 
 
+def _pair_label(pair: str) -> str:
+    """Render "a_pas_kpa / b_pas" with the readable names used everywhere else."""
+    return " / ".join(_label(part.strip()) for part in pair.split("/"))
+
+
 def plot_sensitivity_matrix(
     matrix: pd.DataFrame,
     output: Path,
@@ -107,17 +112,7 @@ def plot_sensitivity_matrix(
                 color=style.SURFACE if value > threshold else style.TEXT_SECONDARY,
             )
 
-    ax.set_title(title)
-    ax.text(
-        0.0,
-        1.015,
-        subtitle,
-        transform=ax.transAxes,
-        ha="left",
-        va="bottom",
-        fontsize=8.5,
-        color=style.TEXT_SECONDARY,
-    )
+    style.titled(ax, title, subtitle)
     bar = figure.colorbar(image, ax=ax, fraction=0.022, pad=0.015)
     bar.outline.set_visible(False)
     bar.ax.tick_params(length=0, labelsize=7.5, colors=style.TEXT_MUTED)
@@ -192,16 +187,10 @@ def plot_confounding_map(
                     )
                 )
 
-    ax.set_title(f"Posterior correlation between hidden parameters ({noise_level} noise)")
-    ax.text(
-        0.0,
-        1.015,
+    style.titled(
+        ax,
+        f"Posterior correlation between hidden parameters ({noise_level} noise)",
         f"Outlined cells exceed |r| = {threshold:.2f} and are called confounded",
-        transform=ax.transAxes,
-        ha="left",
-        va="bottom",
-        fontsize=8.5,
-        color=style.TEXT_SECONDARY,
     )
     bar = figure.colorbar(image, ax=ax, fraction=0.03, pad=0.02)
     bar.outline.set_visible(False)
@@ -285,14 +274,14 @@ def plot_tiebreaker(
     """Per confounded pair: does each maneuver narrow the invisible direction, and is it real?
 
     Two panels sharing a row order. Left, how wide the posterior is along the direction the
-    resting study could not resolve, before and after adding the maneuver. Right, the
-    discriminating signal in units of that observable's measurement error, which is what
-    decides whether the proposal is a test or a hope.
+    resting study could not resolve, before and after adding the maneuver; narrower is
+    better, which is the opposite of every other bar chart in these deliverables and is
+    therefore said on the axis. Right, the discriminating signal in units of that
+    observable's measurement error.
 
-    The left panel deliberately does *not* plot posterior correlation. Correlation
-    describes the shape of the uncertainty and not its size, and adding information can
-    raise it while genuinely improving the inference; ranking maneuvers by correlation drop
-    would mislabel a helpful maneuver as harmful.
+    The left panel deliberately does *not* plot posterior correlation. Correlation describes
+    the shape of the uncertainty and not its size, and adding information can raise it while
+    genuinely improving the inference.
     """
     import matplotlib.pyplot as plt
 
@@ -311,97 +300,91 @@ def plot_tiebreaker(
         .reset_index()
         .sort_values(["pair", "after"])
     )
-    labels = [f"{row['pair']}\n{_label(row['maneuver'])}" for _, row in grouped.iterrows()]
+    labels = [
+        f"{_pair_label(row['pair'])}\n{_label(row['maneuver'])}" for _, row in grouped.iterrows()
+    ]
 
     figure, axes = plt.subplots(
         1,
         2,
-        figsize=(11.0, 0.46 * len(grouped) + 2.2),
-        gridspec_kw={"width_ratios": [1.25, 1.0]},
+        figsize=(10.4, 0.52 * len(grouped) + 2.4),
+        gridspec_kw={"width_ratios": [1.35, 1.0], "wspace": 0.08},
     )
 
-    bar_height = 0.34
+    bar_height = 0.32
+    gap = 0.05
     for row_index, (_, row) in enumerate(grouped.iterrows()):
         style.rounded_barh(
             axes[0],
-            row_index + (bar_height + 0.04) / 2,
+            row_index + (bar_height + gap) / 2,
             float(row["before"]),
             bar_height,
             style.SERIES[0],
         )
         style.rounded_barh(
             axes[0],
-            row_index - (bar_height + 0.04) / 2,
+            row_index - (bar_height + gap) / 2,
             float(row["after"]),
             bar_height,
             style.SERIES[1],
         )
-        axes[0].text(
-            float(row["before"]) + 0.015,
-            row_index + (bar_height + 0.04) / 2,
-            f"{row['before']:.3f}",
-            va="center",
-            fontsize=7.2,
-            color=style.TEXT_SECONDARY,
-        )
-        axes[0].text(
-            float(row["after"]) + 0.015,
-            row_index - (bar_height + 0.04) / 2,
-            f"{row['after']:.3f}",
-            va="center",
-            fontsize=7.2,
-            color=style.TEXT_SECONDARY,
-        )
+    span = float(grouped[["before", "after"]].to_numpy().max())
+    for row_index, (_, row) in enumerate(grouped.iterrows()):
+        for value, offset in (
+            (float(row["before"]), (bar_height + gap) / 2),
+            (float(row["after"]), -(bar_height + gap) / 2),
+        ):
+            axes[0].text(
+                value + 0.012 * span,
+                row_index + offset,
+                f"{value:.3f}",
+                va="center",
+                fontsize=7.0,
+                color=style.TEXT_SECONDARY,
+            )
+
     axes[0].plot([], [], color=style.SERIES[0], linewidth=6, label="baseline alone")
     axes[0].plot([], [], color=style.SERIES[1], linewidth=6, label="baseline + maneuver")
-    # Narrower is better here, unlike every other bar chart in the deliverables, so say so.
-    axes[0].text(
-        0.995,
-        -0.14,
-        "narrower is better",
-        transform=axes[0].transAxes,
-        ha="right",
-        va="top",
-        fontsize=7.5,
-        color=style.TEXT_MUTED,
-    )
     axes[0].set_yticks(range(len(grouped)), labels)
-    axes[0].set_xlabel("Posterior width along the direction the resting study could not resolve")
-    axes[0].set_xlim(0, float(grouped[["before", "after"]].to_numpy().max()) * 1.22)
-    axes[0].set_ylim(-0.7, len(grouped) - 0.3)
+    axes[0].set_xlabel("Posterior width along the invisible direction (narrower is better)")
+    axes[0].set_xlim(0, span * 1.30)
+    axes[0].set_ylim(-0.75, len(grouped) - 0.25)
     axes[0].grid(axis="y", visible=False)
-    axes[0].set_title("Does the maneuver narrow the invisible direction?")
-    axes[0].legend(loc="lower right")
+    axes[0].set_title("Does the maneuver narrow it?")
+    axes[0].legend(loc="upper center", bbox_to_anchor=(0.5, -0.10), ncol=2)
 
     for row_index, (_, row) in enumerate(grouped.iterrows()):
         snr = float(row["snr"])
         colour = style.STATUS_GOOD if snr >= 1.0 else style.TEXT_MUTED
-        style.rounded_barh(axes[1], row_index, snr, 0.5, colour)
+        style.rounded_barh(axes[1], row_index, snr, 0.46, colour)
         axes[1].text(
-            snr + 0.05,
+            snr + 0.06,
             row_index,
             f"{snr:.2f}",
             va="center",
-            fontsize=7.2,
+            fontsize=7.0,
             color=style.TEXT_SECONDARY,
         )
     axes[1].axvline(1.0, color=style.TEXT_PRIMARY, linewidth=1.1, linestyle=(0, (4, 3)))
     axes[1].text(
-        1.0,
-        len(grouped) - 0.35,
-        " one measurement error",
+        1.05,
+        len(grouped) - 0.45,
+        "one measurement error",
         fontsize=7.5,
         color=style.TEXT_SECONDARY,
         ha="left",
         va="center",
     )
     axes[1].set_yticks(range(len(grouped)), [""] * len(grouped))
-    axes[1].set_xlabel("Discriminating signal, in units of measurement error")
-    axes[1].set_ylim(-0.7, len(grouped) - 0.3)
+    axes[1].set_xlabel("Discriminating signal / measurement error")
+    axes[1].set_xlim(0, max(1.3, float(grouped["snr"].max()) * 1.22))
+    axes[1].set_ylim(-0.75, len(grouped) - 0.25)
     axes[1].grid(axis="y", visible=False)
-    axes[1].set_title("Is the signal bigger than the error bar?")
+    axes[1].set_title("Is the signal real?")
 
-    figure.tight_layout()
+    # A legend anchored outside the axes is not something tight_layout can reason about,
+    # so the margins are set explicitly instead of warned about.
+    figure.subplots_adjust(left=0.24, right=0.98, top=0.90, bottom=0.16)
     output.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(output)
     plt.close(figure)

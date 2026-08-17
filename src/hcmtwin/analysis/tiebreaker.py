@@ -22,13 +22,26 @@ those maneuvers harmful.
 
 **Do the credible intervals shrink?** The per-parameter version of the first question.
 
-**Is the discriminating signal real?** This is the part that decides whether the proposal
-survives contact with a clinic. Take two parameter settings separated along the *confounded
-direction* by an amount the resting study cannot distinguish. Compute what each would
-produce under the maneuver. The difference is the discriminating signal, and it is
-reported in the observable's own clinical units next to that observable's measurement
-error. A signal smaller than the error bar is not a test, however good the posterior
-correlation looks.
+**Is the discriminating signal real?** Take two parameter settings separated along the
+*confounded direction* by an amount the resting study cannot distinguish, compute what each
+would produce under the maneuver, and report the difference in the observable's own clinical
+units next to that observable's measurement error.
+
+**These last two answers disagree here, and the disagreement is the result.** The maneuver
+produces a signal several measurement errors wide, yet the posterior barely narrows along
+the direction that signal was supposed to resolve. That is not a contradiction and it is not
+a numerical artefact: the emulator's error is at most a quarter of the measurement error, so
+it is not the limit either. The signal is computed with the other three hidden parameters
+held at their true values, and the posterior is not allowed that luxury. A change in the
+maneuver's observables that is large when everything else is known can be *mimicked* by
+adjusting the nuisance parameters, and an inference that must estimate all five at once
+cannot tell the two explanations apart.
+
+So the two columns answer different questions, and both belong in the table. The signal
+column answers "if the rest of the tissue were characterised, would this maneuver separate
+these two mechanisms?" The narrowing column answers "given that the rest of the tissue is
+also unknown, does it?" The second is the operative one for a clinic, and it is the one the
+table ranks on.
 
 A maneuver can also fail for a reason that has nothing to do with information: a very stiff
 ventricle at 150 beats per minute may not fill at all, so the solve is unphysiological.
@@ -156,8 +169,16 @@ def discriminating_signal(
 
     The two settings are the truth displaced by plus and minus one posterior standard
     deviation along the confounded direction, which is by construction the displacement a
-    resting study cannot resolve. Everything is computed on the **exact** forward model,
-    not the surrogate, because this number is the clinical claim.
+    resting study cannot resolve. Everything is computed on the **exact** forward model, not
+    the surrogate.
+
+    **Important caveat, and the reason this number is optimistic.** The other three hidden
+    parameters are held at their true values. A real inference does not know them, and the
+    observable change this function reports can be partly mimicked by adjusting them. So
+    read this as an upper bound: the signal available *if the rest of the tissue were
+    characterised*. The posterior narrowing computed by :func:`ridge_width` is the version
+    that accounts for nuisance compensation, and where the two disagree the narrowing is the
+    one to believe.
     """
     lows, highs = hidden_bounds()
     plus = np.clip(case.truth * (1.0 + direction), lows, highs)

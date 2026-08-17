@@ -78,18 +78,7 @@ def plot_loops(
 
     ax.set_xlabel("Left-ventricular volume (mL)")
     ax.set_ylabel("Left-ventricular pressure (mmHg)")
-    ax.set_title(title)
-    if subtitle:
-        ax.text(
-            0.0,
-            1.02,
-            subtitle,
-            transform=ax.transAxes,
-            ha="left",
-            va="bottom",
-            fontsize=8.5,
-            color=style.TEXT_SECONDARY,
-        )
+    style.titled(ax, title, subtitle)
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0)
     ax.grid(axis="both")

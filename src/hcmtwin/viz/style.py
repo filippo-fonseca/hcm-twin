@@ -118,6 +118,30 @@ def apply() -> None:
     )
 
 
+def titled(ax: Any, title: str, subtitle: str | None = None) -> None:
+    """Set a title, and a subtitle above the axes without the two colliding.
+
+    matplotlib places the title a fixed pad above the axes, and anything drawn at an axes
+    y-coordinate just over 1 lands in the same place. The first version of these figures
+    overprinted every subtitle on its own title. The fix is to reserve the space rather
+    than to nudge either of them.
+    """
+    if subtitle:
+        ax.set_title(title, pad=24)
+        ax.text(
+            0.0,
+            1.015,
+            subtitle,
+            transform=ax.transAxes,
+            ha="left",
+            va="bottom",
+            fontsize=8.5,
+            color=TEXT_SECONDARY,
+        )
+    else:
+        ax.set_title(title)
+
+
 def rounded_barh(ax: Any, y: float, width: float, height: float, color: str, **kwargs: Any):  # type: ignore[no-untyped-def]
     """A horizontal bar with a rounded data-end, anchored square to the baseline.
 

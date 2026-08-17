@@ -262,7 +262,13 @@ def build_macros(results_dir: Path) -> str:
         m.set("nPairsTested", len(table))
         m.set("nPairsSeparated", int(table["exceeds_measurement_noise"].sum()))
         best = table.loc[table["ridge_shrinkage"].idxmax()]
-        m.set("bestPair", str(best["confounded_pair"]).replace("_", r"\_"))
+        m.set(
+            "bestPair",
+            " and ".join(
+                PRETTY.get(part.strip(), part.strip().replace("_", " "))
+                for part in str(best["confounded_pair"]).split("/")
+            ),
+        )
         m.set("bestManeuver", PRETTY.get(best["best_maneuver"], best["best_maneuver"]))
         m.set("bestCorrelationBefore", float(best["correlation_before"]), 2)
         m.set("bestRidgeBefore", float(best["ridge_width_before"]), 3)
@@ -270,7 +276,17 @@ def build_macros(results_dir: Path) -> str:
         m.set("bestRidgeShrinkage", 100.0 * float(best["ridge_shrinkage"]), 1)
         m.set("nPairsNarrowed", int((table["ridge_shrinkage"] > 0.05).sum()))
         m.set("bestCorrelationAfter", float(best["correlation_after"]), 2)
-        m.set("bestSignal", float(best["expected_signal"]), 2)
+        signal = float(best["expected_signal"])
+        units = str(best["signal_units"])
+        m.set("bestSignal", signal, 4)
+        # A dimensionless strain of 0.0049 is unreadable; the same number in percentage
+        # points is what a report would print. The rule is general, not a special case.
+        if units == "dimensionless":
+            m.set("bestSignalScaled", 100.0 * signal, 2)
+            m.set("bestSignalScaledUnits", "percentage points")
+        else:
+            m.set("bestSignalScaled", signal, 3)
+            m.set("bestSignalScaledUnits", units)
         m.set("bestSignalUnits", str(best["signal_units"]).replace("^", r"\textasciicircum "))
         m.set(
             "bestSignalObservable",
@@ -310,14 +326,43 @@ def write_macros(results_dir: Path, output: Path) -> Path:
     return output
 
 
-def _fit_to_width(tabular: str) -> str:
-    """Scale a wide table to the text width.
+_SHORT_NAMES = {
+    "phi_baseline": "availability",
+    "a_pas_kpa": "stiff. scale",
+    "b_pas": "stiff. exponent",
+    "ca50_ref_um": "Ca sens.",
+    "peak_strain_amplitude": "strain amplitude",
+    "peak_lvot_gradient_mmhg": "outflow gradient",
+    "e_over_e_prime": "E/e' surrogate",
+    "mean_arterial_pressure_mmhg": "mean arterial pressure",
+    "cardiac_output_l_per_min": "cardiac output",
+    "preload_reduction": "preload reduction",
+    "afterload_increase": "afterload increase",
+}
 
-    The tie-breaker table has nine columns because each one answers a question a reader
-    would otherwise have to ask. Dropping columns to make it fit would trade a real
-    question for a typographic convenience; scaling it does not.
+
+def _shorten(value: object) -> object:
+    """Replace machine names with short readable ones so a table fits the page.
+
+    Done by lookup rather than by truncation: a table that silently clips
+    "peak\\_lvot\\_gradient\\_mmhg" to fit is worse than one that says "outflow gradient".
     """
-    return "\\resizebox{\\linewidth}{!}{%\n" + tabular.rstrip() + "\n}\n"
+    if not isinstance(value, str):
+        return value
+    for machine, readable in _SHORT_NAMES.items():
+        value = value.replace(machine, readable)
+    return value.replace("_", " ")
+
+
+def _small(tabular: str) -> str:
+    """Set a table one size down rather than scaling it.
+
+    An earlier version wrapped the tie-breaker table in ``\\resizebox`` to fit nine columns
+    across the page, which shrank it to about six points and made it unreadable. Dropping
+    the two columns that the surrounding prose already states, and setting the rest at
+    ``\\small``, keeps it legible.
+    """
+    return "{\\small\n" + tabular.rstrip() + "\n}\n"
 
 
 def write_result_tables(results_dir: Path, output_dir: Path) -> list[Path]:
@@ -327,25 +372,25 @@ def write_result_tables(results_dir: Path, output_dir: Path) -> list[Path]:
 
     tiebreaker = _read(results_dir / "tiebreaker_table.csv")
     if tiebreaker is not None and len(tiebreaker):
+        # Plain-text headers, because the frame is written with escape=True: any LaTeX
+        # written here would be escaped and printed as source, which is what an earlier
+        # version did to "$|r|$ before".
         columns = {
             "confounded_pair": "Confounded pair",
-            "best_maneuver": "Best maneuver",
-            "correlation_before": "$|r|$ before",
-            "correlation_after": "$|r|$ after",
-            "ridge_shrinkage": "Invisible dir. narrowed",
-            "discriminating_observable": "Discriminating obs.",
+            "best_maneuver": "Maneuver",
+            "ridge_shrinkage": "Narrowed",
+            "discriminating_observable": "Discriminating",
             "expected_signal": "Signal",
-            "signal_units": "Units",
-            "signal_to_noise": "Signal/noise",
+            "signal_to_noise": "S/N",
             "exceeds_measurement_noise": "Beats noise?",
         }
         frame = tiebreaker[list(columns)].rename(columns=columns)
-        frame = frame.map(lambda v: str(v).replace("_", " ") if isinstance(v, str) else v)
+        frame = frame.map(_shorten)
         path = output_dir / "table_tiebreaker.tex"
         path.write_text(
-            _fit_to_width(
+            _small(
                 frame.to_latex(
-                    index=False, escape=True, column_format="llrrrlrrrc", float_format="%.2f"
+                    index=False, escape=True, column_format="llrlrrc", float_format="%.3g"
                 )
             ),
             encoding="utf-8",
@@ -357,8 +402,8 @@ def write_result_tables(results_dir: Path, output_dir: Path) -> list[Path]:
         columns = {
             "noise_level": "Noise level",
             "parameter": "Hidden parameter",
-            "median_ci90_width": "Relative 90\\% CI width",
-            "median_abs_bias": "Median $|$bias$|$",
+            "median_ci90_width": "Rel. 90 pct CI width",
+            "median_abs_bias": "Median abs. bias",
             "recoverable": "Recoverable?",
         }
         frame = recovery[list(columns)].rename(columns=columns)
@@ -374,8 +419,8 @@ def write_result_tables(results_dir: Path, output_dir: Path) -> list[Path]:
     if structural is not None and len(structural):
         columns = {
             "parameter": "Hidden parameter",
-            "max_total_order_on_observables": "Max $S_T$ on any observable",
-            "total_order_on_outcome": "$S_T$ on the outcome",
+            "max_total_order_on_observables": "Max total-order on any observable",
+            "total_order_on_outcome": "Total-order on the outcome",
             "remedy": "What would be needed",
         }
         frame = structural[list(columns)].rename(columns=columns)
