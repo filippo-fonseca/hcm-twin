@@ -372,7 +372,7 @@ def _compile_latex(source: Path) -> Path | None:
 
     attempts: list[list[str]] = []
     if shutil.which("tectonic"):
-        attempts.append(["tectonic", "--keep-logs", "--synctex=0", source.name])
+        attempts.append(["tectonic", "--keep-logs", source.name])
     if shutil.which("pdflatex"):
         # Twice, so \ref and \label resolve.
         attempts.append(["pdflatex", "-interaction=nonstopmode", "-halt-on-error", source.name])

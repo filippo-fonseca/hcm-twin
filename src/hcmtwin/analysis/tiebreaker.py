@@ -6,14 +6,21 @@ a cardiologist could act on: *resting measurements cannot separate these two mec
 but adding this specific maneuver can, and here is the expected signal in clinical units
 against the documented measurement variability.*
 
-Three things are computed per confounded pair and per candidate maneuver.
+Four things are computed per confounded pair and per candidate maneuver.
 
-**Does the posterior correlation fall?** Re-run the inference with the baseline
-observables *plus* the maneuver's observables and see whether the pair's correlation
-drops.
+**Does the invisible direction narrow?** This is the criterion the table ranks on. Take the
+direction in the pair's plane that the resting study could not resolve, and measure how wide
+the posterior still is along it once the maneuver's observables are added.
 
-**Do the credible intervals shrink?** A drop in correlation with no gain in precision
-means the ridge rotated rather than resolved, which is not progress.
+**Does the posterior correlation fall?** Reported, but *not* used to rank, and the reason is
+worth stating because it is a trap. Correlation describes the shape of the uncertainty, not
+its size. Adding information that constrains the same combination the data already knew
+collapses the cloud further onto its ridge and pushes the correlation *up* while the patient
+becomes better characterised. That is what happens here for two of the three pairs, and an
+earlier version of this table scored maneuvers by correlation drop and would have called
+those maneuvers harmful.
+
+**Do the credible intervals shrink?** The per-parameter version of the first question.
 
 **Is the discriminating signal real?** This is the part that decides whether the proposal
 survives contact with a clinic. Take two parameter settings separated along the *confounded
@@ -100,7 +107,8 @@ def confounded_direction(posterior: PosteriorResult, pair: Pair) -> np.ndarray:
 
     The leading eigenvector of the two-by-two posterior covariance, in *relative* units so
     the two parameters are comparable whatever their scales. Returned as a full-length
-    vector of relative perturbations with zeros outside the pair.
+    vector of relative perturbations with zeros outside the pair, scaled to one posterior
+    standard deviation along that direction.
     """
     columns = np.array([pair.index_a, pair.index_b])
     samples = posterior.chain[:, columns]
@@ -112,6 +120,28 @@ def confounded_direction(posterior: PosteriorResult, pair: Pair) -> np.ndarray:
     direction[columns] = leading
     spread = float(np.sqrt(np.max(eigenvalues)))
     return direction * spread
+
+
+def ridge_width(posterior: PosteriorResult, direction: np.ndarray) -> float:
+    """Posterior standard deviation along a fixed direction, in relative units.
+
+    **This, not the correlation, is the honest measure of whether a maneuver helped.**
+
+    Posterior correlation measures the *shape* of the uncertainty, not its size, and the
+    two move independently. Adding a maneuver's observables tightens the posterior, and if
+    the extra information constrains the two parameters in the same combination it already
+    knew, the cloud collapses further onto the ridge and the correlation goes *up* while
+    the patient becomes better characterised. That is not a paradox and it is not a bug: it
+    is what happened here for two of the three pairs examined, and a table that scored
+    maneuvers by correlation drop would have called those maneuvers harmful.
+
+    Projecting onto the direction that was invisible at baseline, and asking how wide the
+    posterior still is along it, answers the question actually being asked: is the
+    combination the resting study could not see any better resolved now?
+    """
+    unit = direction / max(float(np.linalg.norm(direction)), 1e-12)
+    relative = posterior.chain / np.median(posterior.chain, axis=0)
+    return float(np.std(relative @ unit))
 
 
 def discriminating_signal(
@@ -211,9 +241,15 @@ def run(
                 before = abs(float(baseline_correlation[pair.index_a, pair.index_b]))
                 after = abs(float(after_correlation[pair.index_a, pair.index_b]))
                 best = None
+                ridge_before = float("nan")
+                ridge_after = float("nan")
                 if usable:
                     try:
                         direction = confounded_direction(baseline, pair)
+                        # Both widths are measured along the *same* direction, the one that
+                        # was invisible at baseline, so the comparison is like for like.
+                        ridge_before = ridge_width(baseline, direction)
+                        ridge_after = ridge_width(posterior, direction)
                         signal = discriminating_signal(
                             case, direction, condition, noise_level, constants=constants
                         )
@@ -239,6 +275,11 @@ def run(
                         "correlation_before": before,
                         "correlation_after": after,
                         "correlation_drop": before - after,
+                        "ridge_width_before": ridge_before,
+                        "ridge_width_after": ridge_after,
+                        "ridge_shrinkage": (
+                            1.0 - ridge_after / ridge_before if ridge_before > 0 else float("nan")
+                        ),
                         "ci_shrinkage_a": (
                             1.0 - after_widths[pair.index_a] / before_widths[pair.index_a]
                         ),
@@ -259,7 +300,12 @@ def run(
 
 
 def summarise(detail: pd.DataFrame) -> pd.DataFrame:
-    """The D5 table: one row per confounded pair, naming the best maneuver."""
+    """The D5 table: one row per confounded pair, naming the best maneuver.
+
+    The maneuver is chosen by how much it narrows the posterior *along the direction that
+    was invisible at baseline*, not by how much it lowers the pair's correlation. Those two
+    criteria disagree here, and the correlation one is wrong: see :func:`ridge_width`.
+    """
     if detail.empty:
         return pd.DataFrame()
 
@@ -280,6 +326,9 @@ def summarise(detail: pd.DataFrame) -> pd.DataFrame:
                 "correlation_before": float(group["correlation_before"].median()),
                 "correlation_after": float(group["correlation_after"].median()),
                 "median_paired_drop": float(group["correlation_drop"].median()),
+                "ridge_shrinkage": float(group["ridge_shrinkage"].median()),
+                "ridge_width_before": float(group["ridge_width_before"].median()),
+                "ridge_width_after": float(group["ridge_width_after"].median()),
                 "ci_shrinkage_a": float(group["ci_shrinkage_a"].median()),
                 "ci_shrinkage_b": float(group["ci_shrinkage_b"].median()),
                 "modal_best_observable": modal,
@@ -296,7 +345,9 @@ def summarise(detail: pd.DataFrame) -> pd.DataFrame:
 
     rows: list[dict[str, object]] = []
     for pair_name, group in grouped.groupby("pair"):
-        winner = group.loc[group["median_paired_drop"].idxmax()]
+        # Ranked by how much the *invisible direction* narrows, not by how much the
+        # correlation falls. See ridge_width for why the second is the wrong criterion.
+        winner = group.loc[group["ridge_shrinkage"].idxmax()]
         rows.append(
             {
                 "confounded_pair": pair_name,
@@ -304,6 +355,9 @@ def summarise(detail: pd.DataFrame) -> pd.DataFrame:
                 "correlation_before": round(float(winner["correlation_before"]), 3),
                 "correlation_after": round(float(winner["correlation_after"]), 3),
                 "correlation_drop": round(float(winner["median_paired_drop"]), 3),
+                "ridge_width_before": round(float(winner["ridge_width_before"]), 4),
+                "ridge_width_after": round(float(winner["ridge_width_after"]), 4),
+                "ridge_shrinkage": round(float(winner["ridge_shrinkage"]), 3),
                 "ci_shrinkage_a": round(float(winner["ci_shrinkage_a"]), 3),
                 "ci_shrinkage_b": round(float(winner["ci_shrinkage_b"]), 3),
                 "discriminating_observable": winner["modal_best_observable"],
@@ -318,7 +372,7 @@ def summarise(detail: pd.DataFrame) -> pd.DataFrame:
                 "n_patients": int(winner["n_patients"]),
             }
         )
-    return pd.DataFrame(rows).sort_values("correlation_before", ascending=False)
+    return pd.DataFrame(rows).sort_values("ridge_shrinkage", ascending=False)
 
 
 def structural_unidentifiability_note(

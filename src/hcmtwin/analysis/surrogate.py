@@ -206,8 +206,12 @@ class Surrogate:
         r2 = self.holdout_r2
         defined = np.isfinite(r2)
         if not defined.any():
-            return {"min_r2": float("nan"), "median_r2": float("nan"),
-                    "worst_output": None, "n_constant_outputs": int(len(r2))}
+            return {
+                "min_r2": float("nan"),
+                "median_r2": float("nan"),
+                "worst_output": None,
+                "n_constant_outputs": len(r2),
+            }
         index = int(np.arange(len(r2))[defined][int(np.argmin(r2[defined]))])
         return {
             "min_r2": float(np.min(r2[defined])),

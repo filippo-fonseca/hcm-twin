@@ -54,11 +54,11 @@ of them is measured. We built a three-layer mechanistic ventricle (parked/availa
 a one-fiber chamber, a closed circulation), pinned the quantities imaging measures well and
 treated only tissue material properties as unknown, and then asked the inverse question:
 which of those hidden parameters can a realistic clinical measurement set recover?
-The model reproduces \nGatesPassed{} of \nGates{} prespecified validation gates and makes
-two quantitative predictions that were not fitted: an over-response rate of
-\overResponderRate\% in a virtual cohort built with the pivotal trial's own enrolment
-criteria, against a published 5.2\%, and a \efChangeMid{}-point fall in ejection fraction at
-the mid dose, against a placebo-corrected 4.8 points reported for aficamten.
+The model reproduces \nGatesPassed{} of \nGates{} prespecified validation gates. It predicts
+a \efChangeMid{}-point fall in ejection fraction at the mid dose against a placebo-corrected
+4.8 points reported for aficamten, with no parameter fitted to any published dose-response
+curve. It under-predicts the rate at which patients cross the ejection-fraction floor
+(\overResponderRate\% against a published 5.2\%), which we report rather than tune away.
 The identifiability result is largely negative and, we argue, more useful for being so.
 \claim{Drug clearance explains \outcomeTopSTpct\% of the variance in who over-responds and is
 \emph{structurally} invisible before the first dose}: it enters the model only through drug
@@ -224,8 +224,22 @@ ladder and under four provocation maneuvers, untreated and at the mid dose.
 hypertrophy on imaging, gradient $\geq$ 30\,mmHg at rest or 50 provoked) leaves \nEligible{}
 patients with a median ejection fraction of \medianEligibleEF{}, a median gradient of
 \medianEligibleGradient\,mmHg and a median wall thickness of \medianEligibleWall\,cm.
-\claim{\overResponderRate\% of them cross the ejection-fraction floor at or below the mid
-dose}, against a published 5.2\%. Nothing in the priors was tuned to that number.
+
+\overResponderRate\% of them cross the ejection-fraction floor at or below the mid dose,
+against a published 5.2\% over a full titration. \caution{The model under-predicts this
+rate and we report the discrepancy rather than closing it.} Three reasons are visible in
+the cohort. The eligible virtual patients are more severely obstructive than the trial's
+(\obstructiveFraction\% obstructive, median gradient \medianEligibleGradient\,mmHg against
+roughly 55) and start from a higher ejection fraction, so they have further to fall. The
+mid-dose criterion is stricter than a full titration accumulated over years. And the
+model's response distribution has a thinner tail than reality, plausibly because outflow
+obstruction buffers ejection fraction against changes in contractility: in the most
+obstructive patients end-systolic volume is set by the outflow tract closing rather than by
+how hard the muscle pulls.
+
+Tuning the drug parameters to close this gap was available and was not done. It would have
+converted the exposure-response comparison above from a prediction into a fit, and the
+provenance table would then have had to mark it non-independent.
 
 \begin{figure}[t]
   \centering
@@ -316,14 +330,27 @@ relative 90\% credible interval is below 0.60.}
 \subsection{Tie-breaker search}
 
 For each confounded pair and each candidate maneuver we recomputed the posterior using
-baseline observables \emph{plus} the maneuver's, and scored the drop in correlation, the
-shrinkage of the credible intervals, and the discriminating signal in clinical units against
-that observable's measurement error. The signal is computed by displacing the truth along the
-\emph{confounded direction} by the amount a resting study cannot resolve, and asking how far
-apart the two indistinguishable patients look under the maneuver.
+baseline observables \emph{plus} the maneuver's. The signal is computed by displacing the
+truth along the \emph{confounded direction} by the amount a resting study cannot resolve,
+and asking how far apart the two indistinguishable patients look under the maneuver.
+
+\paragraph{A note on the scoring criterion, because the obvious one is wrong.} The natural
+score is the drop in the pair's posterior correlation, and it misleads here.
+\claim{Correlation describes the shape of the uncertainty, not its size.} Adding information
+that constrains the same combination the data already knew collapses the posterior further
+onto its ridge, so the correlation goes \emph{up} while the patient becomes better
+characterised. That is what happens for two of the three pairs examined: correlations rise
+from \bestCorrelationBefore{} to \bestCorrelationAfter{} and higher under every maneuver. An
+earlier version of this table ranked on correlation drop and would have reported those
+maneuvers as harmful.
+
+The table therefore ranks on how much the maneuver narrows the posterior \emph{along the
+direction that was invisible at baseline}: the posterior standard deviation projected onto
+that fixed direction, before and after. That is the question actually being asked.
 
 \input{table_tiebreaker}
-\captionof{table}{The tie-breaker table. ``Beats noise?'' compares the discriminating signal
+\captionof{table}{The tie-breaker table. Ranked by how much the maneuver narrows the
+invisible direction, not by correlation. ``Beats noise?'' compares the discriminating signal
 with one standard deviation of that observable's documented measurement error, which is a
 deliberately generous bar.}
 \label{tab:tiebreaker}
@@ -337,14 +364,16 @@ deliberately generous bar.}
   \label{fig:tiebreaker}
 \end{figure}
 
-The best case is \bestPair{} under \bestManeuver, where the posterior correlation falls from
-\bestCorrelationBefore{} to \bestCorrelationAfter{} and the discriminating signal is
-\bestSignal\,\bestSignalUnits{} in \bestSignalObservable, or \bestSignalToNoise{} measurement
-standard deviations (exceeds noise: \bestExceedsNoise). \nPairsSeparated{} of \nPairsTested{}
-examined pairs produce a signal above one measurement error. The maneuver was interpretable
-in \bestManeuverUsable\% of the patients it was applied to; the remainder are ventricles too
-stiff to fill at the provoked heart rate, which is not a numerical failure but the maneuver
-being uninterpretable in exactly the patients it was proposed for.
+The best case is \bestPair{} under \bestManeuver, where the width along the invisible
+direction falls from \bestRidgeBefore{} to \bestRidgeAfter{} (a \bestRidgeShrinkage\%
+reduction) and the discriminating signal is \bestSignal\,\bestSignalUnits{} in
+\bestSignalObservable, or \bestSignalToNoise{} measurement standard deviations (exceeds
+noise: \bestExceedsNoise). \nPairsSeparated{} of \nPairsTested{} examined pairs produce a
+signal above one measurement error, and \nPairsNarrowed{} show a meaningful narrowing of the
+invisible direction. The maneuver was interpretable in \bestManeuverUsable\% of the patients
+it was applied to; any remainder are ventricles too stiff to fill at the provoked heart
+rate, which is not a numerical failure but the maneuver being uninterpretable in exactly the
+patients it was proposed for.
 
 \section{Discussion}
 

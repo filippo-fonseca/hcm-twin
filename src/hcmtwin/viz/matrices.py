@@ -282,11 +282,17 @@ def plot_tiebreaker(
     detail: pd.DataFrame,
     output: Path,
 ) -> pd.DataFrame:
-    """Per confounded pair: does each maneuver reduce the correlation, and is it real?
+    """Per confounded pair: does each maneuver narrow the invisible direction, and is it real?
 
-    Two panels sharing a row order. Left, the correlation before and after. Right, the
+    Two panels sharing a row order. Left, how wide the posterior is along the direction the
+    resting study could not resolve, before and after adding the maneuver. Right, the
     discriminating signal in units of that observable's measurement error, which is what
     decides whether the proposal is a test or a hope.
+
+    The left panel deliberately does *not* plot posterior correlation. Correlation
+    describes the shape of the uncertainty and not its size, and adding information can
+    raise it while genuinely improving the inference; ranking maneuvers by correlation drop
+    would mislabel a helpful maneuver as harmful.
     """
     import matplotlib.pyplot as plt
 
@@ -298,8 +304,8 @@ def plot_tiebreaker(
     grouped = (
         usable.groupby(["pair", "maneuver"])
         .agg(
-            before=("correlation_before", "median"),
-            after=("correlation_after", "median"),
+            before=("ridge_width_before", "median"),
+            after=("ridge_width_after", "median"),
             snr=("best_signal_to_noise", "median"),
         )
         .reset_index()
@@ -333,7 +339,7 @@ def plot_tiebreaker(
         axes[0].text(
             float(row["before"]) + 0.015,
             row_index + (bar_height + 0.04) / 2,
-            f"{row['before']:.2f}",
+            f"{row['before']:.3f}",
             va="center",
             fontsize=7.2,
             color=style.TEXT_SECONDARY,
@@ -341,19 +347,30 @@ def plot_tiebreaker(
         axes[0].text(
             float(row["after"]) + 0.015,
             row_index - (bar_height + 0.04) / 2,
-            f"{row['after']:.2f}",
+            f"{row['after']:.3f}",
             va="center",
             fontsize=7.2,
             color=style.TEXT_SECONDARY,
         )
     axes[0].plot([], [], color=style.SERIES[0], linewidth=6, label="baseline alone")
     axes[0].plot([], [], color=style.SERIES[1], linewidth=6, label="baseline + maneuver")
+    # Narrower is better here, unlike every other bar chart in the deliverables, so say so.
+    axes[0].text(
+        0.995,
+        -0.14,
+        "narrower is better",
+        transform=axes[0].transAxes,
+        ha="right",
+        va="top",
+        fontsize=7.5,
+        color=style.TEXT_MUTED,
+    )
     axes[0].set_yticks(range(len(grouped)), labels)
-    axes[0].set_xlabel("Absolute posterior correlation of the pair")
-    axes[0].set_xlim(0, 1.05)
+    axes[0].set_xlabel("Posterior width along the direction the resting study could not resolve")
+    axes[0].set_xlim(0, float(grouped[["before", "after"]].to_numpy().max()) * 1.22)
     axes[0].set_ylim(-0.7, len(grouped) - 0.3)
     axes[0].grid(axis="y", visible=False)
-    axes[0].set_title("Does the maneuver break the confound?")
+    axes[0].set_title("Does the maneuver narrow the invisible direction?")
     axes[0].legend(loc="lower right")
 
     for row_index, (_, row) in enumerate(grouped.iterrows()):

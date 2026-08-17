@@ -22,6 +22,11 @@ paper/*.fls
 paper/*.fdb_latexmk
 paper/*.synctex.gz
 
-# Results are committed deliberately (figures and the CSV behind each one),
-# so results/ is NOT ignored. Scratch output is.
+# Results are committed deliberately: every figure ships with the CSV behind it, which is
+# the point. Two exceptions, both regenerable from the logged seed:
 results/scratch/
+# 11 MB of every observable at every condition for every one of 5005 patients. No figure
+# reads it; the labelled per-patient summary that figures do read is committed.
+results/population_conditions.csv.gz
+# The run log is a transcript, not a result.
+results_run.log

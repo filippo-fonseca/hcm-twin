@@ -52,6 +52,34 @@ PRETTY: dict[str, str] = {
 }
 
 
+_DIGIT_WORDS = {
+    "0": "Zero",
+    "1": "One",
+    "2": "Two",
+    "3": "Three",
+    "4": "Four",
+    "5": "Five",
+    "6": "Six",
+    "7": "Seven",
+    "8": "Eight",
+    "9": "Nine",
+}
+
+
+def _macro_suffix(parameter: str) -> str:
+    """Turn a parameter name into a legal LaTeX macro suffix.
+
+    TeX control sequences are letters only, so ``ca50_ref_um`` cannot become
+    ``Ca50RefUm``. Digits are spelled out rather than dropped, because dropping them would
+    silently collide ``ca50`` with a hypothetical ``ca``.
+    """
+    words = []
+    for word in parameter.split("_"):
+        spelled = "".join(_DIGIT_WORDS.get(ch, ch) for ch in word)
+        words.append(spelled[:1].upper() + spelled[1:])
+    return "".join(words)
+
+
 class _Macros:
     """Accumulates LaTeX macro definitions, escaping nothing and checking everything."""
 
@@ -145,7 +173,7 @@ def build_macros(results_dir: Path) -> str:
     if sobol is not None:
         outcome = sobol[sobol["quantity"] == "ef_drop_at_mid_dose"].set_index("parameter")
         for name in HIDDEN_ORDER:
-            macro = "outcomeST" + "".join(w.capitalize() for w in name.split("_"))
+            macro = "outcomeST" + _macro_suffix(name)
             m.set(macro, float(outcome.loc[name, "ST"]) if name in outcome.index else np.nan, 3)
         top = outcome.sort_values("ST", ascending=False)
         m.set("outcomeTopParameter", PRETTY.get(top.index[0], top.index[0]))
@@ -156,7 +184,7 @@ def build_macros(results_dir: Path) -> str:
         if summary_sens is not None:
             indexed = summary_sens.set_index("parameter")
             for name in HIDDEN_ORDER:
-                macro = "bestST" + "".join(w.capitalize() for w in name.split("_"))
+                macro = "bestST" + _macro_suffix(name)
                 value = (
                     float(indexed.loc[name, "best_total_order"])
                     if name in indexed.index
@@ -209,7 +237,7 @@ def build_macros(results_dir: Path) -> str:
     if recovery is not None:
         realistic = recovery[recovery["noise_level"] == "realistic"].set_index("parameter")
         for name in HIDDEN_ORDER:
-            macro = "ciWidth" + "".join(w.capitalize() for w in name.split("_"))
+            macro = "ciWidth" + _macro_suffix(name)
             value = (
                 float(realistic.loc[name, "median_ci90_width"])
                 if name in realistic.index
@@ -233,10 +261,14 @@ def build_macros(results_dir: Path) -> str:
     if table is not None and len(table):
         m.set("nPairsTested", len(table))
         m.set("nPairsSeparated", int(table["exceeds_measurement_noise"].sum()))
-        best = table.loc[table["correlation_drop"].idxmax()]
+        best = table.loc[table["ridge_shrinkage"].idxmax()]
         m.set("bestPair", str(best["confounded_pair"]).replace("_", r"\_"))
         m.set("bestManeuver", PRETTY.get(best["best_maneuver"], best["best_maneuver"]))
         m.set("bestCorrelationBefore", float(best["correlation_before"]), 2)
+        m.set("bestRidgeBefore", float(best["ridge_width_before"]), 3)
+        m.set("bestRidgeAfter", float(best["ridge_width_after"]), 3)
+        m.set("bestRidgeShrinkage", 100.0 * float(best["ridge_shrinkage"]), 1)
+        m.set("nPairsNarrowed", int((table["ridge_shrinkage"] > 0.05).sum()))
         m.set("bestCorrelationAfter", float(best["correlation_after"]), 2)
         m.set("bestSignal", float(best["expected_signal"]), 2)
         m.set("bestSignalUnits", str(best["signal_units"]).replace("^", r"\textasciicircum "))
@@ -278,6 +310,16 @@ def write_macros(results_dir: Path, output: Path) -> Path:
     return output
 
 
+def _fit_to_width(tabular: str) -> str:
+    """Scale a wide table to the text width.
+
+    The tie-breaker table has nine columns because each one answers a question a reader
+    would otherwise have to ask. Dropping columns to make it fit would trade a real
+    question for a typographic convenience; scaling it does not.
+    """
+    return "\\resizebox{\\linewidth}{!}{%\n" + tabular.rstrip() + "\n}\n"
+
+
 def write_result_tables(results_dir: Path, output_dir: Path) -> list[Path]:
     """Emit the LaTeX tables the paper includes, straight from the result CSVs."""
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -290,7 +332,8 @@ def write_result_tables(results_dir: Path, output_dir: Path) -> list[Path]:
             "best_maneuver": "Best maneuver",
             "correlation_before": "$|r|$ before",
             "correlation_after": "$|r|$ after",
-            "discriminating_observable": "Discriminating observable",
+            "ridge_shrinkage": "Invisible dir. narrowed",
+            "discriminating_observable": "Discriminating obs.",
             "expected_signal": "Signal",
             "signal_units": "Units",
             "signal_to_noise": "Signal/noise",
@@ -300,8 +343,10 @@ def write_result_tables(results_dir: Path, output_dir: Path) -> list[Path]:
         frame = frame.map(lambda v: str(v).replace("_", " ") if isinstance(v, str) else v)
         path = output_dir / "table_tiebreaker.tex"
         path.write_text(
-            frame.to_latex(
-                index=False, escape=True, column_format="llrrlrrrc", float_format="%.2f"
+            _fit_to_width(
+                frame.to_latex(
+                    index=False, escape=True, column_format="llrrrlrrrc", float_format="%.2f"
+                )
             ),
             encoding="utf-8",
         )
