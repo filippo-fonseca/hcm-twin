@@ -59,6 +59,7 @@ Each is documented in place in the source and in `docs/research/04_model_provena
 | End-diastolic quantities read at the beat's closing instant, not at the argmax of volume | `model._run_beat` | During isovolumic contraction the volume sits on a plateau while pressure climbs 100 mmHg; an argmax landed late in the upstroke and reported an end-diastolic pressure 2-3x too high (17.6 vs 9.3 mmHg). |
 | E/e' surrogate built from the transmitral pressure gradient | `observables.observe_arrays` | Dividing peak mitral flow by peak lengthening rate is very nearly `dV/dt` over `dV/dt`, so the ratio was an almost pure function of chamber geometry and barely moved when the tissue was stiffened. |
 | Heart rate and LV mass excluded from the inference likelihood | `observables.UNINFORMATIVE_NAMES` | Both are constant across the hidden parameters for a fixed patient, so no posterior can learn from them. LV mass is the interesting case: wall volume is pinned as known and mass is wall volume times a density constant. |
+| Paper runs to 11 pages, not the specified 6-8 | `paper/main.tex` | Sections 6 (Conclusions, graded by confidence) and 7 (Where to look next, clinical and computational) were added on request after the first 8-page build, along with an AI-usage disclosure. The extra three pages are all conclusions and next steps; nothing was added to the methods. Kept rather than trimmed because a reader asking "what do I do with this" was the stated priority. |
 | `parameters.py` and `validation.py` added to the specified layout | — | The dataclasses are cross-cutting and cannot live in `defaults.py` (the provenance test scans it for constants). `validation.py` holds the gates as data so the tests and the report cannot drift. |
 
 ---
@@ -250,6 +251,28 @@ filling pressure, the raised E/e', or the energetic penalty.
   document that reads it); the second completed in 375 s with pdflatex producing an 841 kB
   PDF, every deliverable present, and `validation_all_pass: true`. That is the definition
   of done, actually executed rather than asserted.
+
+## How this was built (AI usage)
+
+Recorded here as well as in the README and the paper, so a future session inherits the same
+disclosure rather than re-deriving it.
+
+This project was implemented with **Claude Code** (Anthropic) working alongside the author. The
+assistant wrote the bulk of the Python implementation, the test suite, the figure code and the
+first drafts of the research dossier and the paper; it also ran the literature search, the
+parameter calibration sweeps, and the debugging of the model failures recorded in the calibration
+record above. Direction, scope, scientific judgement and acceptance of every result remained with
+the author.
+
+Two commitments follow, and any future session must keep them:
+
+- **Never fabricate a citation.** Every reference in `docs/research/bibliography.bib` was located
+  and its content verified. Where a needed number could not be traced to a primary source, the
+  dossier says `[GAP]` and states what would be required. Do not fill a `[GAP]` with a plausible
+  value to make a table look complete.
+- **Document failures, not just fixes.** Several of the substantive findings came out of things
+  that broke. Each is recorded with the symptom that exposed it, so the fix can be judged rather
+  than trusted. Keep doing that.
 
 ## If you are picking this up
 
