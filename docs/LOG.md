@@ -174,6 +174,13 @@ filling pressure, the raised E/e', or the energetic penalty.
 - Integration is in normalised beat phase so a cohort with mixed heart rates advances in
   lockstep. That is why `backend.py` exists; do not collapse it to one backend.
 - Whole pipeline: population ~3.5 min, identifiability ~8 min, tie-breaker ~5 min.
+- **The one remaining slow spot** is `dashboard._loop_traces`, which runs 2600 scalar
+  solves in a Python loop to collect pressure-volume traces for the explorer'''s emulator.
+  Everything else in the project vectorises across patients; this cannot, because
+  `simulate_cohort` deliberately does not record traces (storing them for a real cohort
+  would cost gigabytes). Fixing it means adding subsampled trace recording to the cohort
+  path, which is worth doing if the explorer is rebuilt often and is not worth touching the
+  core solver for otherwise. Costs 2 minutes on the host, about 5 in the container.
 
 ---
 
