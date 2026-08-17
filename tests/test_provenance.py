@@ -73,8 +73,11 @@ def _provenance_rows() -> dict[str, dict[str, str]]:
         cells = [c.strip() for c in stripped.strip("|").split("|")]
         if len(cells) < 6:
             continue
+        # Skip the markdown header separator, which is dashes and colons in every cell.
+        if all(cell and set(cell) <= set("-: ") for cell in cells):
+            continue
         name = cells[0].strip("`")
-        if not name.isupper() or set(cells[1]) <= set("-: "):
+        if not name.isupper():
             continue
         rows[name] = {
             "symbol": cells[1],
@@ -191,13 +194,21 @@ def test_no_unresolved_verify_markers() -> None:
 
 
 def test_every_gap_marker_is_justified() -> None:
-    """A ``[GAP]`` must be followed by prose saying what is missing and what we did."""
-    pattern = re.compile(r"\[GAP\]\s*(.{40,})")
+    """A ``[GAP]`` must be followed by prose saying what is missing and what we did.
+
+    Checked per paragraph rather than per line, because the constraint is about content
+    and line breaks are just formatting. A marker with nothing after it is a debt dressed
+    as a disclosure.
+    """
     offenders: list[str] = []
     for path in sorted(RESEARCH.glob("*.md")):
-        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
-            if "[GAP]" in line and not pattern.search(line):
-                offenders.append(f"{path.name}:{number}")
+        text = path.read_text(encoding="utf-8")
+        for index, paragraph in enumerate(re.split(r"\n\s*\n", text)):
+            if "[GAP]" not in paragraph:
+                continue
+            tail = paragraph.split("[GAP]", 1)[1]
+            if len(" ".join(tail.split())) < 60:
+                offenders.append(f"{path.name}: paragraph {index}")
     assert not offenders, (
         "[GAP] markers with no explanation of what is missing: " + ", ".join(offenders)
     )

@@ -23,10 +23,7 @@ people do.
 from __future__ import annotations
 
 from .backend import SCALAR, Backend, Numeric
-
-_NG_PER_MG = 1.0e6
-_ML_PER_L = 1.0e3
-_HOURS_PER_DAY = 24.0
+from .units import HOURS_PER_DAY, ML_PER_L, NG_PER_MG
 
 
 def steady_state_concentration_ng_per_ml(
@@ -44,7 +41,7 @@ def steady_state_concentration_ng_per_ml(
     back-calculated from that same band, and it is labelled ``calibrated`` in the
     provenance table for precisely this reason.
     """
-    return dose_mg_per_day * _NG_PER_MG / (clearance_l_per_h * _HOURS_PER_DAY * _ML_PER_L)
+    return dose_mg_per_day * NG_PER_MG / (clearance_l_per_h * HOURS_PER_DAY * ML_PER_L)
 
 
 def effective_phi(
