@@ -143,17 +143,24 @@ def titled(ax: Any, title: str, subtitle: str | None = None) -> None:
 
 
 def rounded_barh(ax: Any, y: float, width: float, height: float, color: str, **kwargs: Any):  # type: ignore[no-untyped-def]
-    """A horizontal bar with a rounded data-end, anchored square to the baseline.
+    """A horizontal bar rounded at the value end and square at the baseline.
 
-    Rounded at the value end and square at the axis end, so the bar reads as growing from
-    the baseline rather than floating.
+    Square where it meets the axis so the bar reads as growing *from* the baseline, rounded
+    at the far end so the data end is soft. Rounding both ends turns a bar into a pill,
+    which floats and reads as an interval rather than a magnitude.
+
+    The corner radius is a fraction of the bar height rather than half of it, for the same
+    reason: at half the height the two arcs meet and the shape is a pill again.
     """
-    from matplotlib.patches import FancyBboxPatch
+    from matplotlib.patches import FancyBboxPatch, Rectangle
 
-    radius = min(height / 2.0, abs(width) / 2.0) if width != 0 else 0.0
-    patch = FancyBboxPatch(
+    magnitude = abs(width)
+    if magnitude <= 0.0:
+        return None
+    radius = min(0.32 * height, 0.45 * magnitude)
+    body = FancyBboxPatch(
         (0.0, y - height / 2.0),
-        max(abs(width) - radius, 1e-9),
+        max(magnitude - radius, 1e-12),
         height,
         boxstyle=f"round,pad=0,rounding_size={radius}",
         linewidth=0,
@@ -161,8 +168,18 @@ def rounded_barh(ax: Any, y: float, width: float, height: float, color: str, **k
         mutation_aspect=1.0,
         **kwargs,
     )
-    ax.add_patch(patch)
-    return patch
+    ax.add_patch(body)
+    # Square off the baseline end by covering the left arc.
+    ax.add_patch(
+        Rectangle(
+            (0.0, y - height / 2.0),
+            min(radius, magnitude),
+            height,
+            linewidth=0,
+            facecolor=color,
+        )
+    )
+    return body
 
 
 def annotate_illustrative(ax: Any) -> None:
