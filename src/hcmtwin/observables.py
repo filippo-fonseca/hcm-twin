@@ -28,7 +28,6 @@ non-invasive stand-in and is the one the default feature set uses.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass, fields
 from typing import Literal
 
@@ -307,8 +306,76 @@ Derived fields are dropped so that one measurement is not counted several times 
 different names, which would shrink the posterior for free."""
 
 
-def _safe_divide(numerator: float, denominator: float, fallback: float = 0.0) -> float:
-    return numerator / denominator if abs(denominator) > 1e-12 else fallback
+def _safe_divide(
+    numerator: np.ndarray, denominator: np.ndarray, fallback: float = 0.0
+) -> np.ndarray:
+    """Elementwise division that returns ``fallback`` instead of a warning or an infinity.
+
+    Extreme corners of the sampled parameter space can produce a virtual patient whose
+    stroke work is essentially zero. That is a legitimate simulation result and it should
+    not take the whole cohort run down with a divide-by-zero, but it also must not quietly
+    become an infinity that poisons a Sobol index.
+    """
+    denom = np.asarray(denominator, dtype=float)
+    return np.where(np.abs(denom) > 1e-12, np.asarray(numerator, dtype=float) / denom, fallback)
+
+
+def observe_arrays(
+    summary: object,
+    wall_volume_ml: np.ndarray,
+    body_surface_area_m2: np.ndarray,
+    heart_rate_bpm: np.ndarray,
+) -> dict[str, np.ndarray]:
+    """Vectorised reduction of a cohort beat summary to the clinical measurement set.
+
+    The single-patient :func:`observe` is a thin wrapper around this, so the two paths
+    cannot drift apart in the way two hand-written copies of the same arithmetic would.
+    """
+    s = summary
+    edv = np.asarray(s.edv_ml, dtype=float)  # type: ignore[attr-defined]
+    esv = np.asarray(s.esv_ml, dtype=float)  # type: ignore[attr-defined]
+    stroke_volume = edv - esv
+    stroke_work = np.asarray(s.stroke_work_mmhg_ml, dtype=float) * MMHG_ML_TO_JOULE  # type: ignore[attr-defined]
+    thickness = wall_thickness_cm(edv, wall_volume_ml)
+
+    # E wave: the Doppler velocity implied by the peak atrioventricular pressure gradient,
+    # via the same simplified Bernoulli relation (dp = 4 v^2, v in m/s) a sonographer uses.
+    # The factor of 100 converts m/s to cm/s.
+    transmitral = np.maximum(
+        np.asarray(s.peak_transmitral_gradient_mmhg, dtype=float), 0.0  # type: ignore[attr-defined]
+    )
+    e_wave_cm_per_s = 100.0 * np.sqrt(transmitral / 4.0)
+    # e' wave: peak myocardial lengthening rate, scaled to an annular velocity.
+    e_prime_cm_per_s = (
+        np.asarray(s.peak_lengthening_rate_per_s, dtype=float) * d.ANNULUS_LENGTH_CM  # type: ignore[attr-defined]
+    )
+    atp_au = np.asarray(s.atp_per_head, dtype=float) * wall_volume_ml  # type: ignore[attr-defined]
+
+    return {
+        "edv_ml": edv,
+        "esv_ml": esv,
+        "stroke_volume_ml": stroke_volume,
+        "ejection_fraction": _safe_divide(stroke_volume, edv),
+        "wall_thickness_cm": thickness,
+        "lv_mass_g": wall_volume_ml * d.MYOCARDIUM_DENSITY_G_PER_ML,
+        "peak_lvot_gradient_mmhg": np.asarray(s.peak_lvot_gradient_mmhg, dtype=float),  # type: ignore[attr-defined]
+        "end_diastolic_pressure_mmhg": np.asarray(
+            s.end_diastolic_pressure_mmhg, dtype=float  # type: ignore[attr-defined]
+        ),
+        "e_over_e_prime": _safe_divide(e_wave_cm_per_s, e_prime_cm_per_s),
+        "peak_strain_amplitude": np.asarray(s.peak_strain - s.min_strain, dtype=float),  # type: ignore[attr-defined]
+        "mean_arterial_pressure_mmhg": np.asarray(s.mean_arterial_mmhg, dtype=float),  # type: ignore[attr-defined]
+        "cardiac_output_l_per_min": np.asarray(
+            s.mean_systemic_flow_ml_per_s, dtype=float  # type: ignore[attr-defined]
+        )
+        * 60.0
+        / 1000.0,
+        "heart_rate_bpm": np.asarray(heart_rate_bpm, dtype=float),
+        "thickness_to_cavity_ratio": _safe_divide(thickness, edv),
+        "stroke_volume_index_ml_per_m2": _safe_divide(stroke_volume, body_surface_area_m2),
+        "stroke_work_j": stroke_work,
+        "atp_cost_per_stroke_work": _safe_divide(atp_au, stroke_work),
+    }
 
 
 def observe(
@@ -317,42 +384,40 @@ def observe(
     loading: Loading,
 ) -> Observables:
     """Reduce a converged beat to the clinical measurement set."""
-    s = result.summary
-    edv = float(s.edv_ml)
-    esv = float(s.esv_ml)
-    stroke_volume = edv - esv
-    stroke_work = float(s.stroke_work_mmhg_ml) * MMHG_ML_TO_JOULE
-    thickness = wall_thickness_cm(edv, measured.wall_volume_ml)
-
-    # E wave: the Doppler velocity implied by the peak atrioventricular pressure gradient,
-    # via the same simplified Bernoulli relation (dp = 4 v^2, v in m/s) a sonographer uses.
-    # 100 converts m/s to cm/s.
-    e_wave_cm_per_s = 100.0 * math.sqrt(max(float(s.peak_transmitral_gradient_mmhg), 0.0) / 4.0)
-    # e' wave: peak myocardial lengthening rate, scaled to an annular velocity.
-    e_prime_cm_per_s = float(s.peak_lengthening_rate_per_s) * d.ANNULUS_LENGTH_CM
-    atp_au = float(s.atp_per_head) * measured.wall_volume_ml
-
-    return Observables(
-        edv_ml=edv,
-        esv_ml=esv,
-        stroke_volume_ml=stroke_volume,
-        ejection_fraction=_safe_divide(stroke_volume, edv),
-        wall_thickness_cm=thickness,
-        lv_mass_g=measured.lv_mass_g,
-        peak_lvot_gradient_mmhg=float(s.peak_lvot_gradient_mmhg),
-        end_diastolic_pressure_mmhg=float(s.end_diastolic_pressure_mmhg),
-        e_over_e_prime=_safe_divide(e_wave_cm_per_s, e_prime_cm_per_s),
-        peak_strain_amplitude=float(s.peak_strain - s.min_strain),
-        mean_arterial_pressure_mmhg=float(s.mean_arterial_mmhg),
-        cardiac_output_l_per_min=float(s.mean_systemic_flow_ml_per_s) * 60.0 / 1000.0,
-        heart_rate_bpm=loading.heart_rate_bpm,
-        thickness_to_cavity_ratio=_safe_divide(thickness, edv),
-        stroke_volume_index_ml_per_m2=_safe_divide(
-            stroke_volume, measured.body_surface_area_m2
-        ),
-        stroke_work_j=stroke_work,
-        atp_cost_per_stroke_work=_safe_divide(atp_au, stroke_work),
+    one = np.ones(1)
+    fields = observe_arrays(
+        result.summary,
+        wall_volume_ml=one * measured.wall_volume_ml,
+        body_surface_area_m2=one * measured.body_surface_area_m2,
+        heart_rate_bpm=one * loading.heart_rate_bpm,
     )
+    return Observables(**{k: float(np.asarray(v).reshape(-1)[0]) for k, v in fields.items()})
+
+
+def hidden_truth_arrays(
+    summary: object,
+    phi_baseline: np.ndarray,
+    phi_effective: np.ndarray,
+    a_pas_kpa: np.ndarray,
+    b_pas: np.ndarray,
+    ca50_ref_um: np.ndarray,
+    clearance_l_per_h: np.ndarray,
+    concentration_ng_per_ml: np.ndarray,
+) -> dict[str, np.ndarray]:
+    """Vectorised ground-truth block. Scoring only, never a predictor."""
+    s = summary
+    return {
+        "phi_baseline": np.asarray(phi_baseline, dtype=float),
+        "phi_effective": np.asarray(phi_effective, dtype=float),
+        "a_pas_kpa": np.asarray(a_pas_kpa, dtype=float),
+        "b_pas": np.asarray(b_pas, dtype=float),
+        "ca50_ref_um": np.asarray(ca50_ref_um, dtype=float),
+        "clearance_l_per_h": np.asarray(clearance_l_per_h, dtype=float),
+        "concentration_ng_per_ml": np.asarray(concentration_ng_per_ml, dtype=float),
+        "peak_attached_fraction": np.asarray(s.peak_attached, dtype=float),  # type: ignore[attr-defined]
+        "contractile_reserve": np.asarray(s.mean_parked, dtype=float),  # type: ignore[attr-defined]
+        "atp_per_head_per_beat": np.asarray(s.atp_per_head, dtype=float),  # type: ignore[attr-defined]
+    }
 
 
 def hidden_truth(result: BeatResult, hidden: HiddenMaterial) -> HiddenTruth:
