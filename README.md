@@ -1,128 +1,298 @@
+<div align="center">
+
 # hcm-twin
 
-A mechanistic digital twin of a hypertrophic cardiomyopathy (HCM) ventricle under myosin-inhibitor
-dosing, built to answer one question:
+**A mechanistic digital twin of a hypertrophic cardiomyopathy ventricle under myosin-inhibitor dosing, built to find out which clinical measurements can see the thing that decides who over-responds.**
+
+[![tests](https://img.shields.io/badge/tests-142%20passing-1baf7a)](tests/)
+[![validation gates](https://img.shields.io/badge/validation%20gates-35%2F35-1baf7a)](results/validation_table.md)
+[![python](https://img.shields.io/badge/python-3.11%2B-2a78d6)](pyproject.toml)
+[![license](https://img.shields.io/badge/license-MIT-2a78d6)](LICENSE)
+[![reproducible](https://img.shields.io/badge/make%20all-16%20min-eb6834)](Dockerfile)
+
+[The question](#the-question) · [What you get](#what-you-get) · [Quickstart](#quickstart) · [Findings](#findings) · [Where to look next](#where-to-look-next) · [Honesty](#honesty-constraints) · [AI usage](#ai-usage)
+
+</div>
+
+---
+
+## The question
 
 > Two patients have the same ejection fraction the day before treatment starts. One tolerates dose
-> escalation; the other falls through the 50% ejection-fraction floor and has to stop. **What
-> measurement, taken beforehand, could have told them apart?**
+> escalation; the other falls through the 50% ejection-fraction floor and has to stop.
+> **What measurement, taken beforehand, could have told them apart?**
 
-The project is a zero-dimensional, three-layer model (sarcomere → chamber → closed-loop
-circulation) plus an identifiability analysis that asks which hidden tissue-level and molecular
-parameters non-invasive clinical measurements can and cannot recover.
+Cardiac myosin inhibitors work by reducing the fraction of myosin heads available to generate force.
+That is also exactly how they cause their main adverse effect, so the therapeutic window is narrow
+and titration is done by serial echocardiography: dose, wait, measure, adjust. This project asks
+whether the measurement doing the adjusting is capable, even in principle, of seeing what actually
+drives the risk.
+
+The answer, for the largest single driver, is no. That is the point of the repository.
 
 ## Why mechanistic
 
-The published industry models are statistical: drug concentration in, ejection fraction out, fitted
-to trial data. They are the right tool for designing a titration schedule. But there is no heart
-between input and output, so they cannot separate "too much drug" from "a ventricle with no
-reserve," and they cannot leave the covariate distribution of the trial population. This repository
-builds the mechanistic alternative and then, crucially, measures how much of it is actually
-identifiable from a clinical echo.
+Published industry models are statistical: concentration in, ejection fraction out, fitted to trial
+data. They are the right tool for designing a titration schedule. But there is no heart between the
+input and the output, so they cannot separate *too much drug* from *a ventricle with no reserve*,
+and they cannot leave the covariate distribution of the trial population.
 
-## The structural trick that makes it tractable
+This repository builds the mechanistic alternative (sarcomere → chamber → closed-loop circulation)
+and then does the part that usually gets skipped: it measures how much of the mechanism is
+**actually identifiable** from a clinical echocardiogram.
 
-Clinical imaging measures **shape** accurately (wall thickness, cavity volume, mass) and **material**
-not at all (tissue stiffness, fraction of myosin heads available). So the model pins the shape per
-virtual patient and infers only the material. Six unknowns drop to five, of which only three are
-strongly coupled. The split is enforced in code: `MeasuredGeometry` and `HiddenMaterial` are
-separate frozen dataclasses and no function accepts a merged dictionary.
+<table>
+<tr><td width="50%">
 
-## Layout
+**The structural move that makes it tractable**
 
-```
-docs/research/        D0  research dossier: every number in the code traces to a row here
-src/hcmtwin/          D1  the package
-  calcium.py              prescribed Ca2+ transient
-  sarcomere.py            Layer 1: parked / available / attached myosin
-  chamber.py              Layer 2: one-fiber cavity mechanics (Arts 1991)
-  circulation.py          Layer 3: closed loop, blood volume conserved
-  obstruction.py          LVOT obstruction with flow-dependent narrowing
-  drug.py                 dose -> steady-state exposure -> shift in head availability
-  model.py                assembly, steady-state beat solver
-  observables.py          only what a clinic could measure (+ a quarantined hidden-truth block)
-  population.py           virtual cohort sampling (Saltelli)
-  provocation.py          Valsalva / tachycardia / handgrip / exercise analogues
-  analysis/               sensitivity, identifiability, tie-breaker search
-  viz/                    figures and the interactive explorer
-tests/                D2  validation gates
-notebooks/            D2  validation, population, analysis
-paper/                D7  LaTeX writeup
-results/                  every figure, and the CSV behind it
-```
+Clinical imaging measures **shape** well (wall thickness, cavity volume, mass) and **material** not
+at all (tissue stiffness, fraction of myosin heads available). So the model pins the shape per
+virtual patient and infers only the material.
+
+The split is enforced in code, not in prose: `MeasuredGeometry` and `HiddenMaterial` are separate
+frozen dataclasses, no function accepts a merged dictionary, and the ground-truth accessor lives
+behind a quarantined module that raises if used as a predictor.
+
+</td><td width="50%">
+
+**The three layers**
+
+| Layer | What it does |
+|---|---|
+| Sarcomere | parked / available / attached myosin, force-dependent recruitment, cross-bridge distortion |
+| Chamber | one-fibre cavity mechanics (Arts et al. 1991), thick-wall geometry |
+| Circulation | closed loop, blood volume conserved by construction, flow-dependent outflow obstruction |
+
+Deliberately zero-dimensional. No finite elements: the goal is thousands of virtual patients under
+inference, not one beautiful mesh.
+
+</td></tr>
+</table>
+
+## What you get
+
+Four artifacts, all in `results/`, all regenerated by one command, each with the CSV behind it.
+
+| # | Artifact | What it tells you |
+|---|---|---|
+| **D2** | [`validation_table.md`](results/validation_table.md) | 35 prespecified physiological gates, all passing, each with its literature target |
+| **D3** | [`fig_sensitivity_matrix.png`](results/fig_sensitivity_matrix.png) | which hidden tissue parameter each clinical measurement can see, and how strongly |
+| **D4** | [`fig_confounding_map.png`](results/fig_confounding_map.png) + [`recovery_table.csv`](results/recovery_table.csv) | which parameters a realistic echo recovers, which it cannot, at two documented noise levels |
+| **D5** | [`tiebreaker_table.csv`](results/tiebreaker_table.csv) | per confounded pair: does any provocation maneuver resolve it, and does the signal clear measurement error |
+| **D6** | [`explorer.html`](results/explorer.html) | single self-contained page, no server, no build step: move the hidden parameters and watch the loop |
+| **D7** | [`paper/main.pdf`](paper/main.pdf) | the writeup, every number in it resolved from a results file at build time |
+
+Plus a research dossier (`docs/research/`, 48 sources) in which **every one of the model's 65
+constants** traces to a cited row, labelled `measured`, `calibrated` or `assumed`, with a
+`[GAP]` marker wherever the literature could not supply what the model needed.
 
 ## Quickstart
 
 ```bash
-make setup      # venv + pinned dependencies
-make test       # the full suite, including every Section 7 validation gate
-make all        # everything: gates, figures, CSVs, explorer, PDF
+make setup      # venv + pinned dependencies (requirements.lock)
+make test       # full suite: 142 tests including every validation gate
+make all        # everything: gates, cohort, figures, CSVs, explorer, PDF  (~16 min)
 ```
 
-Or reproducibly, with no local Python at all:
+Or with no local Python at all:
 
 ```bash
 docker build -t hcm-twin . && docker run --rm -v "$PWD/results:/app/results" hcm-twin
 ```
 
-`make all` is the definition of done: from a clean checkout it produces the validation table (D2),
-the sensitivity matrix (D3), the confounding map (D4), the tie-breaker table (D5), the interactive
-explorer (D6), and the compiled writeup (D7), with the CSV behind every figure committed alongside
-it.
+`make all` is the definition of done. From a clean checkout it produces D2 through D7 with the
+CSV behind every figure, from a logged seed (`20260816`), and writes a manifest recording what was
+generated. It has been verified end to end inside the container.
 
-## What it found
+Individual stages, if you want one thing:
 
-**The phenotype is a consequence, not an input.** Raising myosin availability and passive
-stiffness and thickening the wall yields, as outputs: a supranormal ejection fraction (0.75
-against a 0.66 healthy reference), a reduced stroke volume, an elevated filling pressure,
-reduced longitudinal strain despite preserved ejection fraction, and roughly twice the ATP
-cost per unit of external work. A test walks the package's syntax tree to prove no
-observable is ever assigned a literal.
+```bash
+python -m hcmtwin.cli validate | population | sensitivity | identifiability | tiebreaker | explorer | paper
+```
 
-**Wall thickening alone raises ejection fraction.** Give the HCM geometry *healthy* material
-and the ejection fraction is 0.758, slightly above the diseased reference. That is correct
-physiology and it is the sharpest available statement of why this project exists: in a
+## Findings
+
+### 1. The phenotype is a consequence, not an input
+
+Raise myosin availability and passive stiffness, thicken the wall, and the model *outputs* the HCM
+picture: supranormal ejection fraction (0.75 against a 0.66 healthy reference), reduced stroke
+volume, elevated filling pressure, reduced longitudinal strain despite preserved ejection fraction,
+roughly twice the ATP cost per unit of external work. None of that is written down anywhere. A test
+walks the package's syntax tree to prove no observable is ever assigned a literal.
+
+### 2. Wall thickening alone raises ejection fraction
+
+Give the HCM geometry *healthy* material and ejection fraction is 0.758, slightly **above** the
+diseased reference. What the thick wall does not produce is the raised filling pressure, the raised
+E/e′ surrogate, or the energetic penalty. Those need the material change, and they are what make a
+patient symptomatic. This is the sharpest one-line statement of why the project exists: in a
 thick-walled ventricle, a reassuring ejection fraction is close to uninformative.
 
-**Two quantitative predictions land, and neither was fitted.** The reference patient loses
-5.3 ejection-fraction points at the mid dose, against a placebo-corrected 4.8 points
-reported for aficamten in SEQUOIA-HCM. No parameter in the model was calibrated against any
-published dose-response curve, and `docs/research/04_model_provenance.md` records the
-confidence label on all 65 constants so that claim can be checked rather than trusted.
+### 3. The headline result is negative, and it is the useful kind
 
-**The headline identifiability result is negative, and it is the useful kind.** Drug
-clearance explains about half the variance in who over-responds and is *structurally*
-invisible before the first dose: its total-order Sobol index on every baseline observable
-is exactly zero, and the Fisher information matrix has a zero eigenvalue whose null
-direction is 100% clearance. It enters the model only through drug exposure, so every
-derivative with respect to it is identically zero. **No provocation maneuver can help**,
-because there is no signal to amplify. What that argues for is pharmacokinetic information
-obtained before titration rather than inferred from its consequences.
+**Drug clearance carries ~50% of the variance in who crosses the ejection-fraction floor, and it is
+structurally invisible before the first dose.** Clearance enters the model only through drug
+exposure, so at zero dose every derivative with respect to it is identically zero: its total-order
+Sobol index on every baseline observable is exactly zero, and the Fisher information matrix has a
+zero eigenvalue whose null direction is 100% clearance.
 
-Of the four tissue parameters, calcium sensitivity and myosin availability are recoverable
-from a routine study; the two passive stiffness parameters trade off against each other.
-The tie-breaker table reports, per confounded pair, which maneuver helps and whether the
-discriminating signal clears the documented measurement error.
+This is arithmetic, not a numerical accident. It would hold for any model in which clearance acts
+only through exposure, which is to say for any pharmacologically sensible one. **And no provocation
+maneuver can help**, because a maneuver amplifies signal and here there is none.
+
+### 4. Two of five hidden parameters are recoverable from a routine study
+
+| | Parameters |
+|---|---|
+| **Recoverable** | calcium sensitivity, myosin availability |
+| **Not recoverable** | passive stiffness scale, passive stiffness exponent, drug clearance |
+
+The two passive stiffness parameters trade off against each other, which is unsurprising for two
+arms of one exponential. Across four maneuvers and three confounded pairs, the best narrowing of an
+invisible direction was **5.4%**. Provocation is not the answer here either.
+
+### 5. Posterior correlation is the wrong way to score a proposed maneuver
+
+A methodological finding that generalises beyond this model. Correlation describes the *shape* of
+the uncertainty, not its *size*, so information that constrains the combination the data already
+knew will raise it while genuinely improving the inference. Score the **width along the direction
+that was invisible** instead. Relatedly: a discriminating signal computed with the other parameters
+held at their true values is an upper bound and can be several-fold optimistic, because a real
+inference can mimic the maneuver's effect by moving what it does not know.
+
+### What we cannot conclude
+
+Stated as plainly as the findings, because it matters as much.
+
+- **Not that any of this describes a particular patient.** Nothing here is validated against one.
+  Both comparisons to trial data are aggregate-to-aggregate.
+- **Not that the absolute numbers are right.** 33 of the model's 65 constants are labelled
+  `assumed`.
+- **Not that the tie-breaker result survives a richer model.** A maneuver that fails here might
+  succeed in a model with regional mechanics or catecholamine-dependent relaxation, neither of
+  which this one has.
+- **The errors are directional.** The noise model treats correlated observables as independent, is
+  Gaussian where real error has heavier tails, and uses an outflow-gradient noise deliberately below
+  what the literature reports. So *"these parameters remain confounded"* is a safe conclusion here,
+  and *"this maneuver separates them"* would be a fragile one.
+
+## Where to look next
+
+**Clinically**
+
+1. **Get the pharmacokinetics before titrating, not from it.** If clearance is both the dominant
+   driver of over-response and invisible to imaging, the information has to come from elsewhere: a
+   CYP2C19 genotype, or a probe dose with a single concentration measurement before escalation
+   begins. This work supplies a mechanistic argument for why echo-guided titration alone cannot
+   substitute, rather than an empirical observation that it did not.
+2. **A prediction testable in data that already exists.** Patients matched on baseline
+   echocardiography but differing in measured exposure should show systematically different
+   dose-response slopes; patients matched on *exposure* should show much less residual spread than
+   patients matched on echocardiography. Both are post-hoc analyses of trial datasets that already
+   contain paired PK and echo measurements. If the second comparison still shows large spread, the
+   clearance conclusion is incomplete.
+3. **For the tissue parameters, measure rather than provoke.** A maneuver moves the operating point
+   along a relation the study already cannot resolve. Separating the two arms of the passive
+   exponential needs the relation sampled at more than one point: shear-wave elastography, or
+   invasive pressure-volume at two loading states.
+4. **Do not design a protocol on effect size alone.** A maneuver that visibly changes a measurement
+   is not thereby diagnostic, if the change can be produced by something else you also have not
+   measured.
+
+**Computationally**, in rough order of how much each would move the conclusions:
+
+1. **Growth and remodelling**, so hypertrophy develops over simulated months rather than being
+   sampled. Largest structural gap.
+2. **Regional mechanics** (3D idealised ventricle), to test whether zero-dimensional conclusions
+   hold once asymmetric hypertrophy, fibre disarray and systolic anterior motion are representable.
+3. **Differentiable inversion** (JAX), replacing the per-patient polynomial emulator with exact
+   gradients.
+4. **Geometry personalisation** against a public cardiac-MRI cohort, turning "pinned geometry" from
+   a convenience into a measurement.
+5. **Catecholamine-dependent relaxation**, the most likely reason the model's filling pressure fails
+   to improve on treatment where trials report that it does.
+
+**Three measurements the literature owes this model**, recorded as `[GAP]` in the dossier rather
+than filled with plausible values: the parked-vs-available myosin fraction in healthy and HCM
+*human* myocardium; a representative-fibre passive stiffness pair fitted to human tissue under this
+constitutive form; and test-retest reproducibility for maximal wall thickness in an HCM cohort.
 
 ## Honesty constraints
 
-These are load-bearing, not boilerplate. See `docs/research/` and the limitations section of the
-writeup.
+Load-bearing, not boilerplate. Each is enforced somewhere you can check.
 
-- No mutation-specific predictions. Claims are about regions of parameter space, never named
+- **No mutation-specific predictions.** Claims are about regions of parameter space, never named
   variants in named patients.
-- No calibration against published trial curves that is then presented as independent validation.
-  The exposure-response comparison in `tests/test_validation.py` is a *prediction*, and it is
-  recorded honestly whether or not it succeeds.
-- Negative results carry equal weight. "Nothing is confounded" and "nothing is separable" are both
-  findings.
-- Every illustrative figure is labelled illustrative.
+- **No fitting to trial curves then presenting it as validation.** No parameter was calibrated
+  against any published dose-response curve, any trial outcome, or the observed rate of
+  ejection-fraction excursions. The provenance table labels all 65 constants so the claim is
+  checkable, and a test fails the build if any constant lacks a sourced row. The exposure-response
+  comparison is therefore a *prediction*: one lands close (5.3 EF points lost at mid dose against a
+  placebo-corrected 4.8 reported for aficamten in SEQUOIA-HCM), one does not, and both are reported.
+- **Negative results carry equal weight.** "Nothing is confounded" and "nothing is separable" are
+  both findings, and here the headline is one of them.
+- **Illustrative figures are labelled illustrative.**
+- **Every number in the paper is a macro resolved from a results file at build time.** None is typed.
 
-## Status
+## AI usage
 
-See `docs/research/00_overview.md` for the argument in one page and
-`docs/research/07_gap_statement.md` for what is and is not known.
+This project was implemented with **[Claude Code](https://claude.com/claude-code) (Anthropic)**
+working alongside me. Being specific about what that means, since vagueness here is its own kind of
+dishonesty:
+
+**Claude Code wrote** the bulk of the Python implementation, the test suite, the figure code, and
+first drafts of the research dossier and the paper. It ran the literature search, the parameter
+calibration sweeps, and the debugging of the model failures documented in the paper (negative
+end-systolic elastance, a filling pressure insensitive to its own stiffness, a misleading
+correlation metric).
+
+**I retained** direction, scope, scientific judgement, and acceptance of every result.
+
+Two things follow that are worth stating explicitly:
+
+- **The citations were checked and the gaps were left open.** Every reference in the bibliography
+  was located and its content verified against the abstract or full text. Where a number the model
+  needed could not be traced to a primary source, the dossier says `[GAP]` and describes what would
+  be required, rather than substituting a plausible value or a fabricated reference.
+- **Several substantive findings emerged from failures rather than from design.** Each is documented
+  in the source, the dossier and the paper together with the symptom that exposed it, so a reader can
+  judge the fix rather than take it on trust.
+
+`docs/LOG.md` is the running engineering log: what was built in what order, every deviation from the
+original specification with its reason, the calibration record, and the open questions.
+
+## Layout
+
+```
+docs/research/        D0  research dossier: every number in the code traces to a row here
+docs/LOG.md               engineering log, deviations, calibration record, open questions
+src/hcmtwin/          D1  the package
+  calcium.py              prescribed Ca²⁺ transient
+  sarcomere.py            Layer 1: parked / available / attached myosin
+  chamber.py              Layer 2: one-fibre cavity mechanics (Arts 1991)
+  circulation.py          Layer 3: closed loop, blood volume conserved
+  obstruction.py          LVOT obstruction with flow-dependent narrowing
+  drug.py                 dose → steady-state exposure → shift in head availability
+  model.py                assembly, steady-state beat solver
+  observables.py          only what a clinic could measure (+ quarantined hidden truth)
+  population.py           virtual cohort sampling (Saltelli)
+  provocation.py          Valsalva / tachycardia / handgrip / exercise analogues
+  analysis/               sensitivity, identifiability, tie-breaker search
+  viz/                    figures and the interactive explorer
+tests/                D2  validation gates and property-based tests
+notebooks/            D2  validation, population, analysis
+paper/                D7  LaTeX writeup
+results/                  every figure, and the CSV behind it
+```
+
+## Citing and contributing
+
+Issues and pull requests are welcome, particularly on the five computational directions above and on
+any of the three `[GAP]` measurements. If you find a constant whose provenance you can improve,
+`docs/research/04_model_provenance.md` is the file to change and the provenance test will hold you
+to it.
 
 ## License
 
-MIT.
+MIT. See [LICENSE](LICENSE).
