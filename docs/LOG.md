@@ -19,7 +19,7 @@ re-deriving anything.
 | D4 confounding map | **done** — `results/fig_confounding_map.png` + CSV |
 | D5 tie-breaker table | **done** — `results/tiebreaker_table.csv` + figure |
 | D6 interactive explorer | **done** — `results/explorer.html`, self-contained |
-| D7 writeup | **done** — `paper/main.pdf`, numbers generated from results |
+| D7 writeup | **done** — `paper/main.pdf`, 8 pages, every number generated from results |
 
 ```bash
 make test        # 121 tests, including every Section 7 gate
@@ -123,10 +123,36 @@ Posterior recovery at realistic noise (relative 90% credible-interval width, low
 better): `ca50_ref_um` 0.34 and `phi_baseline` 0.57 are recoverable; `b_pas` 0.72,
 `a_pas_kpa` 1.18 and `clearance_l_per_h` 1.43 are not.
 
-Most correlated pair: `a_pas_kpa` / `b_pas`, |r| 0.71 at realistic noise and 0.81 at
+Most correlated pair: `a_pas_kpa` / `b_pas`, |r| 0.68 at realistic noise and 0.81 at
 optimistic. **Confounding is higher at lower noise**, which is worth explaining rather than
 glossing: as the data get better the posterior tightens onto the ridge and the correlation
 along it becomes clearer, whereas with more noise the prior box dominates and decorrelates.
+
+### The tie-breaker result, and a metric that had to be replaced
+
+**No maneuver meaningfully resolves any confounded direction.** The best case narrows the
+invisible direction by 5.4% (myosin availability / calcium sensitivity, under combined
+exercise). Two of three pairs show a discriminating signal above one measurement error, but
+that is a different and weaker claim, for the reason below.
+
+Two methodological findings came out of this and both are in the paper.
+
+*Correlation is the wrong score.* The first run ranked maneuvers by the drop in the pair's
+posterior correlation, and every maneuver made it worse (0.68 rising to 0.79-0.88). That is
+an artefact: correlation describes the shape of the uncertainty, not its size, and adding
+information that constrains the combination the data already knew collapses the cloud
+further onto its ridge. The table now ranks on the posterior standard deviation projected
+onto the direction that was invisible at baseline. If you change this, read
+`tiebreaker.ridge_width` first.
+
+*The signal column and the narrowing column disagree, and that is the result.* Exercise
+moves strain amplitude by 8.6 measurement standard deviations between two patients a resting
+study cannot tell apart, yet the posterior barely narrows. It is not the emulator (held-out
+error is at most a quarter of the measurement error, checked) and not sampling noise
+(consistent across all 50 patients and all 4 maneuvers). It is **nuisance compensation**: the
+signal is computed with the other three parameters held at their true values, and an
+inference estimating all five at once can mimic the maneuver's effect by moving the ones it
+does not know.
 
 ### Other findings worth keeping
 
@@ -153,7 +179,7 @@ filling pressure, the raised E/e', or the energetic penalty.
 
 ## Session history
 
-### 2026-08-16 (session 1)
+### 2026-08-16 to 17 (session 1)
 
 1. Scaffolded the repo; venv on Python 3.12 via `uv`.
 2. Literature phase. Key sources located and checked: Campbell 2018 (Layer 1 scheme and
@@ -171,7 +197,15 @@ filling pressure, the raised E/e', or the energetic penalty.
 8. Analysis: Sobol, Fisher information, surrogate-backed MCMC, tie-breaker search.
 9. Pipeline, CLI, figures with a validated palette, self-contained explorer, LaTeX paper
    whose numbers are all generated.
-10. Ran the full study: 5005 patients, 50 identifiability cases.
+10. Ran the full study: 5005 patients, 50 identifiability cases, 16 minutes.
+11. Read the compiled PDF and fixed five rendering defects no test would catch (colliding
+    figure titles, a collapsed tie-breaker figure, LaTeX escaped into table headers, a table
+    scaled to six points, a signal rounded to 0.00). Trimmed to 8 pages.
+12. Replaced the tie-breaker's scoring metric after the first run said every maneuver was
+    harmful; see above.
+13. Verified the explorer in a browser: the twins demo shows identical readouts untreated
+    (EF 0.749 both) diverging to 0.690 and 0.649 at 10 mg from clearance alone, and the
+    emulator agrees with the real model to three decimals.
 
 ---
 
@@ -196,6 +230,14 @@ filling pressure, the raised E/e', or the energetic penalty.
   the paper rather than a footnote, since the naive expectation is the opposite.
 
 ---
+
+## Verified, not assumed
+
+- 137 tests pass; ruff, ruff format and mypy clean across 29 modules.
+- The explorer was opened in a real browser and driven through its presets and sliders.
+- The paper was compiled and read page by page; the defects that found are listed above.
+- CI runs the suite plus a reduced-resolution end-to-end pipeline and asserts every
+  deliverable is produced.
 
 ## If you are picking this up
 
